@@ -30,12 +30,12 @@ NODES=(
 	"https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
 	"https://github.com/christian-byrne/audio-separation-nodes-comfyui"
 	"https://github.com/MinorBoy/ComfyUI_essentials_mb"
-
 )
 
-WORKFLOWS=(
-	""
-)
+# Lasa WORKFLOWS complet goala daca nu ai repo-uri Git de workflow-uri
+# sau adauga URL-uri valide de repo-uri Git aici.
+WORKFLOWS=() # Am golit-o corect
+
 
 CHECKPOINT_MODELS=(
 	""
@@ -43,13 +43,11 @@ CHECKPOINT_MODELS=(
 
 UNET_MODELS=(
 	""
-
 )
 
 DIFFUSION_MODELS=(
   "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B-720P_fp8_e4m3fn.safetensors"
   "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/fantasytalking_fp16.safetensors"
-
 )
 
 CLIP_VISION=(
@@ -83,29 +81,13 @@ CONTROLNET_MODELS=(
 ### DO NOT EDIT BELOW HERE UNLESS YOU KNOW WHAT YOU ARE DOING ###
 
 function provisioning_start() {
-    # Instaleaza aria2 inainte de orice descărcare de modele
-    printf "Verificarea si instalarea aria2c...\n"
-    sudo apt-get update -y
-    sudo apt-get install -y aria2
-
-    if [[ ! -d /opt/environments/python ]]; then
-        export MAMBA_BASE=true
-    fi
-    source /opt/ai-dock/etc/environment.sh
-    source /opt/ai-dock/bin/venv-set.sh comfyui
+    # ATENTIE: Liniile de 'source /opt/ai-dock/...' si instalarea 'aria2'
+    # AU FOST MUTATE in 'Container Start Command' de pe RunPod.
+    # Nu trebuie sa le mai ai aici in scriptul tau 'fantasy talking.sh'.
+    # Ele vor fi rulate inainte ca acest script sa fie 'sursat'.
 
     provisioning_print_header
-    # provisioning_get_apt_packages # Puteți comenta sau șterge această linie dacă aria2 este singurul pachet APT
-    provisioning_get_nodes
-    provisioning_get_pip_packages
-    if [[ ! -d /opt/environments/python ]]; then
-        export MAMBA_BASE=true
-    fi
-    source /opt/ai-dock/etc/environment.sh
-    source /opt/ai-dock/bin/venv-set.sh comfyui
-
-    provisioning_print_header
-    provisioning_get_apt_packages
+    provisioning_get_apt_packages # Va instala 'aria2' si alte pachete APT definite
     provisioning_get_nodes
     provisioning_get_pip_packages
     provisioning_get_models \
@@ -187,24 +169,27 @@ function provisioning_get_nodes() {
 
 function provisioning_get_workflows() {
     for repo in "${WORKFLOWS[@]}"; do
-        dir=$(basename "$repo" .git)
-        path="/opt/ComfyUI/user/default/workflows/${dir}"
-        if [[ -d "$path" ]]; then
-            if [[ ${AUTO_UPDATE,,} != "false" ]]; then
-                printf "Updating workflows: %s...\n" "${repo}"
-                ( cd "$path" && git pull )
+        # Doar daca repo nu este un string gol, incearca clonarea
+        if [[ -n "$repo" ]]; then
+            dir=$(basename "$repo" .git)
+            path="/opt/ComfyUI/user/default/workflows/${dir}"
+            if [[ -d "$path" ]]; then
+                if [[ ${AUTO_UPDATE,,} != "false" ]]; then
+                    printf "Updating workflows: %s...\n" "${repo}"
+                    ( cd "$path" && git pull )
+                fi
+            else
+                printf "Cloning workflows: %s...\n" "${repo}"
+                git clone "$repo" "$path"
             fi
-        else
-            printf "Cloning workflows: %s...\n" "${repo}"
-            git clone "$repo" "$path"
-        fi
+        fi # Adaugat un 'fi' pentru blocul 'if [[ -n "$repo" ]]'
     done
 }
 
 function provisioning_get_default_workflow() {
-    if [[ -n $DEFAULT_WORKFLOW ]]; then
+    if [[ -n "$DEFAULT_WORKFLOW" ]]; then # Am adaugat ghilimele la "$DEFAULT_WORKFLOW"
         workflow_json=$(curl -s "$DEFAULT_WORKFLOW")
-        if [[ -n $workflow_json ]]; then
+        if [[ -n "$workflow_json" ]]; then # Am adaugat ghilimele la "$workflow_json"
             echo "export const defaultGraph = $workflow_json;" > /opt/ComfyUI/web/scripts/defaultGraph.js
         fi
     fi
