@@ -5,7 +5,7 @@
 
 # Packages are installed after nodes so we can fix them...
 
-DEFAULT_WORKFLOW=""
+DEFAULT_WORKFLOW="https://raw.githubusercontent.com/LucianGnn/runpod-inits/refs/heads/main/FantasyTalking%20orig.json"
 
 APT_PACKAGES=(
     "aria2"
@@ -13,7 +13,7 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
-    #"package-1"
+    "huggingface_hub
     #"package-2"
 )
 
