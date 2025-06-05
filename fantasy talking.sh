@@ -5,7 +5,7 @@
 
 # Packages are installed after nodes so we can fix them...
 
-DEFAULT_WORKFLOW="https://raw.githubusercontent.com/LucianGnn/runpod-inits/refs/heads/main/FantasyTalking%20orig.json"
+DEFAULT_WORKFLOW="https://raw.githubusercontent.com/LucianGnn/runpod-inits/main/FantasyTalking%20orig.json"
 
 APT_PACKAGES=(
     "aria2"
@@ -13,7 +13,7 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
-    "huggingface_hub
+    "huggingface_hub"
     #"package-2"
 )
 
@@ -83,6 +83,21 @@ CONTROLNET_MODELS=(
 ### DO NOT EDIT BELOW HERE UNLESS YOU KNOW WHAT YOU ARE DOING ###
 
 function provisioning_start() {
+    # Instaleaza aria2 inainte de orice descărcare de modele
+    printf "Verificarea si instalarea aria2c...\n"
+    sudo apt-get update -y
+    sudo apt-get install -y aria2
+
+    if [[ ! -d /opt/environments/python ]]; then
+        export MAMBA_BASE=true
+    fi
+    source /opt/ai-dock/etc/environment.sh
+    source /opt/ai-dock/bin/venv-set.sh comfyui
+
+    provisioning_print_header
+    # provisioning_get_apt_packages # Puteți comenta sau șterge această linie dacă aria2 este singurul pachet APT
+    provisioning_get_nodes
+    provisioning_get_pip_packages
     if [[ ! -d /opt/environments/python ]]; then
         export MAMBA_BASE=true
     fi
