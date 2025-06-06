@@ -31,8 +31,5 @@ fi
 
 # --- Secțiune: Pornirea ComfyUI ---
 # Asigură-te că te afli în directorul ComfyUI înainte de a rula run_gpu.sh
-echo "All custom initialization scripts completed. Starting ComfyUI..."
+echo "All custom initialization scripts completed."
 
-/workspace/ComfyUI/run_gpu.sh
-# Notă: Comanda de mai sus va bloca execuția scriptului main_init.sh.
-# Orice 'echo' după ea NU va fi afișat în log-uri decât dacă ComfyUI se oprește.
