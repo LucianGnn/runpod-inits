@@ -1,9 +1,11 @@
 #!/bin/bash
 
-echo "Starting init_nodes.sh..."
+echo "Starting install_nodes.sh..."
 
+# --- Secțiune: Verificarea și Activarea Mediului Virtual ComfyUI ---
+source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to activate ComfyUI venv. Exiting init_nodes.sh."
+    echo "ERROR: Failed to activate ComfyUI venv. Exiting install_nodes.sh."
     exit 1
 fi
 echo "ComfyUI venv activated."
@@ -56,40 +58,46 @@ NODES=(
     "https://github.com/MinorBoy/ComfyUI_essentials_mb"
 )
 
-# --- MODIFICARE PENTRU OPTIMIZARE PIP INSTALL -R ---
+# --- MODIFICARE PENTRU A INSTALA REQUIREMENTS DOAR LA PRIMA CLONARE ---
 TEMP_REQUIREMENTS_FILE="/tmp/all_comfyui_requirements.txt"
 > "$TEMP_REQUIREMENTS_FILE"
 
 # Clone/Update custom nodes și colectează cerințele
-echo "Cloning/Updating custom nodes and collecting requirements..."
+echo "Cloning/Updating custom nodes..."
 for repo in "${NODES[@]}"; do
     dir="${repo##*/}"
     path="/workspace/ComfyUI/custom_nodes/${dir}"
     requirements="${path}/requirements.txt"
 
+    WAS_CLONED_NOW=false # Flag pentru a verifica dacă nodul a fost clonat în această rulare
+
     if [[ -d "$path" ]]; then
         echo "Node '${dir}' already exists. Updating (git pull)..."
         ( cd "$path" && git pull )
+        # AICI, DACĂ NODUL EXISTA DEJA, NU MAI COLECTĂM CERINȚELE LUI PENTRU INSTALARE.
+        # RISC: Dacă requirements.txt se schimbă ulterior, nu se vor instala noile dependențe.
     else
         echo "Node '${dir}' not found. Cloning: ${repo} to ${path} (--recursive)..."
         git clone "${repo}" "${path}" --recursive
+        WAS_CLONED_NOW=true # Nodul a fost clonat, deci colectăm cerințele
     fi
 
-    if [[ -e "$requirements" ]]; then
-        echo "Collecting requirements from ${dir}..."
+    # Colectează cerințele doar dacă nodul a fost clonat acum (instalare inițială)
+    if $WAS_CLONED_NOW && [[ -e "$requirements" ]]; then
+        echo "Collecting requirements from ${dir} (initial clone)..."
         cat "$requirements" >> "$TEMP_REQUIREMENTS_FILE"
     fi
 done
 
-# Instalează toate cerințele consolidate O SINGURĂ DATĂ
+# Instalează toate cerințele consolidate O SINGURĂ DATĂ (doar cele colectate din nodurile recent clonate)
 if [[ -s "$TEMP_REQUIREMENTS_FILE" ]]; then
-    echo "Installing all consolidated requirements for custom nodes..."
+    echo "Installing consolidated requirements for newly cloned custom nodes..."
     pip install --no-cache-dir -r "$TEMP_REQUIREMENTS_FILE"
     if [ $? -ne 0 ]; then
-        echo "Warning: Failed to install consolidated requirements for custom nodes."
+        echo "Warning: Failed to install consolidated requirements for newly cloned custom nodes."
     fi
 else
-    echo "No custom node requirements files found or collected."
+    echo "No new custom nodes cloned or no requirements files found for them."
 fi
 
-echo "init_nodes.sh completed."
+echo "install_nodes.sh completed."
