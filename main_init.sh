@@ -29,16 +29,4 @@ if [ $? -ne 0 ]; then
     echo "Warning: download_models_fantasy_talking.sh reported an error."
 fi
 
-# --- Secțiune: Pornirea ComfyUI ---
-# Asigură-te că te afli în directorul ComfyUI înainte de a rula run_gpu.sh
 echo "All custom initialization scripts completed."
-
-# --- Secțiune: Pornirea ComfyUI ---
-echo "All custom initialization scripts completed."
-
-# Asigură-te că ești în directorul ComfyUI
-cd /workspace/ComfyUI
-
-# Pornește ComfyUI
-python main.py --preview-method auto --listen --port 8188
-
