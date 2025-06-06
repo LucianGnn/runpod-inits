@@ -2,8 +2,6 @@
 
 echo "Starting install_nodes.sh..."
 
-# --- Secțiune: Verificarea și Activarea Mediului Virtual ComfyUI ---
-source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to activate ComfyUI venv. Exiting install_nodes.sh."
     exit 1
