@@ -2,8 +2,6 @@
 
 echo "Starting download_models_fantasy_talking.sh..."
 
-# Activăm mediul virtual ComfyUI
-source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "Failed to activate ComfyUI venv. Exiting."
     exit 1
