@@ -2,10 +2,6 @@
 
 echo "Starting download_models_fantasy_talking.sh..."
 
-# --- Secțiune: Verificarea și Activarea Mediului Virtual ComfyUI ---
-# Asigură-te că mediul virtual ComfyUI este activat.
-# (Acest bloc este păstrat pentru siguranță, chiar dacă main_init.sh ar trebui să-l activeze deja)
-source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to activate ComfyUI venv in download_models_fantasy_talking.sh. Exiting."
     exit 1
@@ -17,7 +13,7 @@ echo "Checking/Installing aria2c..."
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
     # ATENTIE: AM ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-    apt-get update # FARA sudo
+    #apt-get update # FARA sudo
     apt-get -y install aria2 # FARA sudo
 else
     echo "aria2c is already installed."
