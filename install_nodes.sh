@@ -12,7 +12,7 @@ echo "ComfyUI venv activated."
 # Install APT packages
 echo "Installing APT packages..."
 # ATENTIE: Am ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-apt-get update # Necessar pentru a actualiza lista de pachete disponibile
+#apt-get update 
 # Verificare și instalare aria2
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
