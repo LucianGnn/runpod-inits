@@ -2,8 +2,6 @@
 
 echo "Starting init_nodes.sh..."
 
-# Ensure we are in a clean state, although main_init.sh should activate venv
-source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "Failed to activate ComfyUI venv in init_nodes.sh. Exiting."
     exit 1
