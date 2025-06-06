@@ -2,6 +2,8 @@
 
 echo "Starting install_nodes.sh..."
 
+# --- Secțiune: Verificarea și Activarea Mediului Virtual ComfyUI ---
+source /workspace/ComfyUI/venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to activate ComfyUI venv. Exiting install_nodes.sh."
     exit 1
@@ -12,7 +14,7 @@ echo "ComfyUI venv activated."
 # Install APT packages
 echo "Installing APT packages..."
 # ATENTIE: Am ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-#apt-get update 
+apt-get update # Necessar pentru a actualiza lista de pachete disponibile
 # Verificare și instalare aria2
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
@@ -71,7 +73,10 @@ for repo in "${NODES[@]}"; do
 
     if [[ -d "$path" ]]; then
         echo "Node '${dir}' already exists. Updating (git pull)..."
-        ( cd "$path" && git pull )
+        ( cd "$path" && git pull origin main || git pull origin master ) # <--- MODIFICARE AICI
+        if [ $? -ne 0 ]; then
+            echo "Warning: git pull failed for node '${dir}'. It might be in a detached HEAD state or on an unusual branch." >&2
+        fi
         # AICI, DACĂ NODUL EXISTA DEJA, NU MAI COLECTĂM CERINȚELE LUI PENTRU INSTALARE.
         # RISC: Dacă requirements.txt se schimbă ulterior, nu se vor instala noile dependențe.
     else
