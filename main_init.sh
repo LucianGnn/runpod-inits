@@ -16,11 +16,20 @@ source /workspace/ComfyUI/venv/bin/activate
 # fi
 
 
-echo "Running download_models_fantasy_talking.sh (Model Download)..."
-# Folosim calea corectă către scriptul download_models_fantasy_talking.sh
-"${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
+# echo "Running download_models_fantasy_talking.sh (Model Download)..."
+# # Folosim calea corectă către scriptul download_models_fantasy_talking.sh
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_fantasy_talking.sh reported an error."
+# fi
+
+echo "Running download_models_flux_dex.sh (Model Download)..."
+# Folosim calea corectă către scriptul download_models_flux_dex.sh
+"${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dex.sh
 if [ $? -ne 0 ]; then
-    echo "Warning: download_models_fantasy_talking.sh reported an error."
+    echo "Warning: download_models_flux_dex.sh reported an error."
 fi
+
+
 
 echo "All custom initialization scripts completed."
