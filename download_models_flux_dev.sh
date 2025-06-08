@@ -125,6 +125,6 @@ echo "Downloading Flux models..."
 # VAE
 # download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" "$VAE_DIR"
 
-download_model_with_check "https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt/resolve/main/svd_xt_image_decoder.safetensors" "$CHECKPOINTS_DIR"
+download_model_with_check "https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt-1-1/resolve/main/svd_xt_1_1.safetensors" "$CHECKPOINTS_DIR"
 
 echo "download_models_flux_dev.sh completed."
