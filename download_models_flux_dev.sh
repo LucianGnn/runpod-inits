@@ -57,15 +57,13 @@ download_model_with_check() {
         # Verifică dacă URL-ul este de la Hugging Face
         if [[ "$model_url" == *"huggingface.co"* ]]; then
             echo "Attempting to download from Hugging Face using direct Python call..."
-            # Extrage repo-id și filename pentru funcția Python
+            local python_download_success=false # Flag pentru a urmări succesul descărcării Python
             
             local repo_id_match=$(echo "$model_url" | sed -E 's|https://huggingface.co/([^/]+/[^/]+)/.*|\1|')
             local filename_hf=$(echo "$model_url" | sed -E 's|.*/([^/]+\.[a-zA-Z0-9]+)$|\1|') # Extrage numele fișierului cu extensie
 
             if [[ -n "$repo_id_match" && -n "$filename_hf" ]]; then
                 # Activăm mediul virtual Python al ComfyUI
-                # Asigură-te că linia de mai jos nu se dublează cu o activare globală în main_init.sh,
-                # dar pentru a fi sigur că funcționează, o punem aici local.
                 source /workspace/ComfyUI/venv/bin/activate
                 
                 # Apelăm funcția Python hf_hub_download direct din linia de comandă
@@ -74,25 +72,30 @@ download_model_with_check() {
                 
                 if [ $? -eq 0 ]; then
                     echo "Download complete for ${output_filename} using direct Python call."
+                    python_download_success=true
                 else
                     echo "Error downloading ${output_filename} using direct Python call." >&2
                     echo "Python download failed. It might be due to missing HF_TOKEN or specific model access restrictions." >&2
                 fi
-            else # <--- Acesta este 'else'-ul de la linia 95, care era problematic.
-                echo "ERROR: Could not parse Hugging Face URL for repo_id and filename. Falling back to aria2c." >&2
-                # Fallback to aria2c if parsing fails
+            else
+                echo "ERROR: Could not parse Hugging Face URL for repo_id and filename for ${output_filename}." >&2
+            fi
+
+            # Încercăm aria2c ca fallback doar dacă descărcarea Python nu a avut succes
+            if ! $python_download_success; then
+                echo "Attempting aria2c fallback for ${output_filename} (Hugging Face URL)."
                 aria2c \
                     -c -x 16 -s 16 \
                     -d "${dest_dir}" -o "${output_filename}" \
                     --console-log-level=warn --summary-interval=0 \
                     "${model_url}"
                 if [ $? -eq 0 ]; then
-                    echo "Download complete for ${output_filename} using aria2c (fallback)."
+                    echo "Download complete for ${output_filename} using aria2c fallback."
                 else
-                    echo "Error downloading ${output_filename} using aria2c (fallback)." >&2
+                    echo "Error downloading ${output_filename} using aria2c fallback. Both methods failed." >&2
                 fi
-            fi # <--- Acest 'fi' închide corect blocul 'if [[ -n "$repo_id_match" && -n "$filename_hf" ]]'.
-        else
+            fi
+        else # Nu este un URL Hugging Face, folosim direct aria2c
             echo "Downloading using aria2c (non-Hugging Face URL)..."
             aria2c \
                 -c -x 16 -s 16 \
@@ -110,16 +113,18 @@ download_model_with_check() {
 
 echo "Downloading Flux models..."
 
-# --- Apelurile funcției pentru fiecare model ---
+# # --- Apelurile funcției pentru fiecare model ---
 
-# UNET
-download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "$UNET_DIR"
+# # UNET
+# download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "$UNET_DIR"
 
-# CLIP
-download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
-download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" "$CLIP_DIR"
+# # CLIP
+# download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
+# download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" "$CLIP_DIR"
 
 # VAE
-download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" "$VAE_DIR"
+# download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" "$VAE_DIR"
+
+download_model_with_check "https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt/resolve/main/svd_xt_image_decoder.safetensors" "$CHECKPOINTS_DIR"
 
 echo "download_models_flux_dev.sh completed."
