@@ -70,7 +70,7 @@ echo "Downloading Flux models..."
 
 # --- Apelurile funcției pentru fiecare model ---
 
-# UNET
+# CHECKPOPINT
 download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "$CHECKPOINTS_DIR"
 
 # CLIP 
