@@ -25,7 +25,7 @@ source /workspace/ComfyUI/venv/bin/activate
 
 echo "Running download_models_flux_dex.sh (Model Download)..."
 # Folosim calea corectă către scriptul download_models_flux_dex.sh
-"${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dex.sh
+"${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dev.sh
 if [ $? -ne 0 ]; then
     echo "Warning: download_models_flux_dex.sh reported an error."
 fi
