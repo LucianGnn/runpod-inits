@@ -31,12 +31,12 @@ if [ $? -ne 0 ]; then
 fi
 
 
-echo "Running download_models_ltxv13b.sh (Model Download)..."
-# Folosim calea corectă către scriptul download_models_flux_dex.sh
-"${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
-if [ $? -ne 0 ]; then
-    echo "Warning: download_models_flux_dex.sh reported an error."
-fi
+# echo "Running download_models_ltxv13b.sh (Model Download)..."
+# # Folosim calea corectă către scriptul download_models_flux_dex.sh
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_flux_dex.sh reported an error."
+# fi
 
 
 
