@@ -2,13 +2,18 @@
 
 echo "Starting main_init.sh - Orchestrating custom setup."
 CUSTOM_SCRIPTS_DIR="/workspace/runpod-inits"
-source /workspace/ComfyUI/venv/bin/activate
 
-# if [ $? -ne 0 ]; then
-#     echo "ERROR: Failed to activate ComfyUI venv. Exiting main_init.sh."
-#     exit 1
-# fi
-# echo "ComfyUI venv activated."
+# Instalează biblioteca huggingface_hub (necesară pentru apelul Python de download)
+echo "Installing huggingface_hub..."
+pip install huggingface_hub
+
+# Activează mediul virtual ComfyUI
+source /workspace/ComfyUI/venv/bin/activate
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to activate ComfyUI venv. Exiting main_init.sh."
+    exit 1
+fi
+echo "ComfyUI venv activated."
 
 # "${CUSTOM_SCRIPTS_DIR}"/install_nodes.sh
 # if [ $? -ne 0 ]; then
@@ -37,8 +42,6 @@ fi
 # if [ $? -ne 0 ]; then
 #     echo "Warning: download_models_flux_dex.sh reported an error."
 # fi
-
-
 
 
 echo "All custom initialization scripts completed."
