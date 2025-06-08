@@ -69,7 +69,7 @@ echo "Downloading Fantasy Talking models..."
 # --- Apelurile funcției pentru fiecare model ---
 
 # UNET
-download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/flux1-dev.safetensors" "$CHECKPOINTS_DIR"
+download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "$CHECKPOINTS_DIR"
 
 # CLIP 
 download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
