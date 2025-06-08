@@ -9,13 +9,15 @@ fi
 echo "ComfyUI venv activated."
 
 # Asigură-te că aria2c este instalat.
+# Asigură-te că aria2c este instalat.
 echo "Checking/Installing aria2c..."
 if ! command -v aria2c &> /dev/null; then
-    echo "aria2c not found, installing..."
-    apt-get update 
-    apt-get -y install aria2 
+    echo "aria2c not found, installing..."
+    apt-get update
+    apt-get -y install aria2
+    hash -r  # Adaugă această linie AICI
 else
-    echo "aria2c is already installed."
+    echo "aria2c is already installed."
 fi
 
 # --- Definirea constantelor pentru căile modelelor ComfyUI ---
