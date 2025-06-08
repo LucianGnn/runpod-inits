@@ -56,24 +56,27 @@ download_model_with_check() {
 
         # Verifică dacă URL-ul este de la Hugging Face
         if [[ "$model_url" == *"huggingface.co"* ]]; then
-            echo "Attempting to download from Hugging Face using huggingface-cli..."
-            # Extrage repo-id și filename pentru huggingface-cli
-            # Această logică se bazează pe formatul URL-urilor tale:
-            # https://huggingface.co/<repo_id>/resolve/main/<filename>
+            echo "Attempting to download from Hugging Face using direct Python call..."
+            # Extrage repo-id și filename pentru funcția Python
             
-            # Use a regex that can handle both 'resolve' and 'blob' paths and extract the full repo_id
             local repo_id_match=$(echo "$model_url" | sed -E 's|https://huggingface.co/([^/]+/[^/]+)/.*|\1|')
             local filename_hf=$(echo "$model_url" | sed -E 's|.*/([^/]+\.[a-zA-Z0-9]+)$|\1|') # Extrage numele fișierului cu extensie
 
             if [[ -n "$repo_id_match" && -n "$filename_hf" ]]; then
-                echo "Using huggingface-cli: repo-id='${repo_id_match}', filename='${filename_hf}', local-dir='${dest_dir}'"
-                huggingface-cli download --repo-id "$repo_id_match" --filename "$filename_hf" --local-dir "$dest_dir" --local-dir-use-symlinks False
+                # Activăm mediul virtual Python al ComfyUI
+                # Asigură-te că linia de mai jos nu se dublează cu o activare globală în main_init.sh,
+                # dar pentru a fi sigur că funcționează, o punem aici local.
+                source /workspace/ComfyUI/venv/bin/activate
+                
+                # Apelăm funcția Python hf_hub_download direct din linia de comandă
+                # Aceasta va folosi automat HF_TOKEN din variabilele de mediu
+                python -c "from huggingface_hub import hf_hub_download; import os; os.makedirs('${dest_dir}', exist_ok=True); hf_hub_download(repo_id='${repo_id_match}', filename='${filename_hf}', local_dir='${dest_dir}', local_dir_use_symlinks=False, resume_download=True)"
                 
                 if [ $? -eq 0 ]; then
-                    echo "Download complete for ${output_filename} using huggingface-cli."
+                    echo "Download complete for ${output_filename} using direct Python call."
                 else
-                    echo "Error downloading ${output_filename} using huggingface-cli." >&2
-                    echo "Huggingface-cli download failed. It might be due to missing login or specific model access restrictions." >&2
+                    echo "Error downloading ${output_filename} using direct Python call." >&2
+                    echo "Python download failed. It might be due to missing HF_TOKEN or specific model access restrictions." >&2
                 fi
             else
                 echo "ERROR: Could not parse Hugging Face URL for repo_id and filename. Falling back to aria2c." >&2
@@ -87,7 +90,7 @@ download_model_with_check() {
                     echo "Download complete for ${output_filename} using aria2c (fallback)."
                 else
                     echo "Error downloading ${output_filename} using aria2c (fallback)." >&2
-                fi
+                F
             fi
         else
             echo "Downloading using aria2c (non-Hugging Face URL)..."
