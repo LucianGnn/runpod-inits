@@ -78,7 +78,7 @@ download_model_with_check() {
                     echo "Error downloading ${output_filename} using direct Python call." >&2
                     echo "Python download failed. It might be due to missing HF_TOKEN or specific model access restrictions." >&2
                 fi
-            else
+            else # <--- Acesta este 'else'-ul de la linia 95, care era problematic.
                 echo "ERROR: Could not parse Hugging Face URL for repo_id and filename. Falling back to aria2c." >&2
                 # Fallback to aria2c if parsing fails
                 aria2c \
@@ -90,8 +90,8 @@ download_model_with_check() {
                     echo "Download complete for ${output_filename} using aria2c (fallback)."
                 else
                     echo "Error downloading ${output_filename} using aria2c (fallback)." >&2
-                F
-            fi
+                fi
+            fi # <--- Acest 'fi' închide corect blocul 'if [[ -n "$repo_id_match" && -n "$filename_hf" ]]'.
         else
             echo "Downloading using aria2c (non-Hugging Face URL)..."
             aria2c \
