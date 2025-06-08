@@ -66,7 +66,7 @@ download_model_with_check() {
     fi
 }
 
-echo "Downloading Fantasy Talking models..."
+echo "Downloading LTXV models..."
 
 # --- Apelurile funcției pentru fiecare model ---
 
