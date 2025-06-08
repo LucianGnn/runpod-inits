@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "Starting download_models_fantasy_talking.sh..."
+echo "Starting download_models_flux_dev.sh..."
 
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to activate ComfyUI venv in download_models_fantasy_talking.sh. Exiting."
+    echo "ERROR: Failed to activate ComfyUI venv in download_models_flux_dev.sh. Exiting."
     exit 1
 fi
 echo "ComfyUI venv activated."
@@ -11,12 +11,11 @@ echo "ComfyUI venv activated."
 # Asigură-te că aria2c este instalat.
 echo "Checking/Installing aria2c..."
 if ! command -v aria2c &> /dev/null; then
-    echo "aria2c not found, installing..."
-    # ATENTIE: AM ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-    #apt-get update # FARA sudo
-    apt-get -y install aria2 # FARA sudo
+    echo "aria2c not found, installing..."
+    apt-get update 
+    apt-get -y install aria2 
 else
-    echo "aria2c is already installed."
+    echo "aria2c is already installed."
 fi
 
 # --- Definirea constantelor pentru căile modelelor ComfyUI ---
@@ -79,4 +78,4 @@ download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encod
 # VAE
 download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" "$VAE_DIR"
 
-echo "download_models_flux_dex.sh completed."
+echo "download_models_flux_dev.sh completed."
