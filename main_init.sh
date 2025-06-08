@@ -43,7 +43,7 @@ fi
 # if [ $? -ne 0 ]; then
 #     echo "Warning: download_models_flux_dex.sh reported an error."
 # fi
-
+./start.sh
 cd /workspace
 ./run_gpu.sh
 echo "All custom initialization scripts completed."
