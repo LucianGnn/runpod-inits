@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "Starting download_models_fantasy_talking.sh..."
+echo "Starting download_models_ltxv13b.sh ..."
 
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to activate ComfyUI venv in download_models_fantasy_talking.sh. Exiting."
+    echo "ERROR: Failed to activate ComfyUI venv. Exiting."
     exit 1
 fi
 echo "ComfyUI venv activated."
@@ -13,7 +13,7 @@ echo "Checking/Installing aria2c..."
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
     # ATENTIE: AM ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-    #apt-get update # FARA sudo
+    apt-get update # FARA sudo
     apt-get -y install aria2 # FARA sudo
 else
     echo "aria2c is already installed."
@@ -29,6 +29,7 @@ TEXT_ENCODERS_DIR="${COMFYUI_MODELS_BASE}/text_encoders"
 LORAS_DIR="${COMFYUI_MODELS_BASE}/loras"
 UNET_DIR="${COMFYUI_MODELS_BASE}/unet"
 VAE_DIR="${COMFYUI_MODELS_BASE}/vae"
+UPSCALE_MODELS_DIR="${COMFYUI_MODELS_BASE}/upscale_models"
 
 
 # --- Funcție pentru descărcarea modelelor cu verificare și extragere nume fișier ---
@@ -70,13 +71,13 @@ echo "Downloading Fantasy Talking models..."
 # --- Apelurile funcției pentru fiecare model ---
 
 # UNET
-download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/flux1-dev.safetensors" "$UNET_DIR"
+download_model_with_check "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-13b-0.9.7-distilled-fp8.safetensors" "$CHECKPOINTS_DIR"
 
 # CLIP 
-download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
+# download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
 download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" "$CLIP_DIR"
 
-# VAE
-download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" "$VAE_DIR"
+# UPSCALE
+download_model_with_check "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-13b-0.9.7-distilled-fp8.safetensors" "$UPSCALE_MODELS_DIR"
 
-echo "download_models_flux_dex.sh completed."
+echo "download_models_ltxv13b.sh completed."
