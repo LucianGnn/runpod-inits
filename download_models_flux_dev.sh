@@ -2,20 +2,25 @@
 
 echo "Starting download_models_flux_dev.sh..."
 
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to activate ComfyUI venv in download_models_flux_dev.sh. Exiting."
-    exit 1
-fi
-echo "ComfyUI venv activated."
+# Asigură-te că venv-ul ComfyUI este activat.
+# Notă: Această verificare '$?' ar trebui să fie după o comandă care setează venv-ul,
+# de obicei 'source /path/to/venv/bin/activate'.
+# Presupunem că venv-ul este activat anterior de main_init.sh.
+# Dacă nu, poți decomenta și adăuga aici:
+# source /workspace/ComfyUI/venv/bin/activate
+# if [ $? -ne 0 ]; then
+#     echo "ERROR: Failed to activate ComfyUI venv in download_models_flux_dev.sh. Exiting."
+#     exit 1
+# fi
+echo "ComfyUI venv activated." # Acest mesaj se bazează pe activarea venv-ului înainte de apelul acestui script.
 
-# Asigură-te că aria2c este instalat.
 # Asigură-te că aria2c este instalat.
 echo "Checking/Installing aria2c..."
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
     apt-get update
     apt-get -y install aria2
-    hash -r  # Adaugă această linie AICI
+    hash -r # Reconstruiește hash-ul comenzilor shell-ului
 else
     echo "aria2c is already installed."
 fi
@@ -48,20 +53,54 @@ download_model_with_check() {
         echo "Model '${output_filename}' already exists at '${full_path}'. Skipping download."
     else
         echo "Downloading: ${output_filename} (from ${model_url}) to ${dest_dir}"
-        aria2c \
-            -c \
-            -x 16 \
-            -s 16 \
-            -d "${dest_dir}" \
-            -o "${output_filename}" \
-            --console-log-level=warn \
-            --summary-interval=0 \
-            "${model_url}"
 
-        if [ $? -eq 0 ]; then
-            echo "Download complete for ${output_filename}."
+        # Verifică dacă URL-ul este de la Hugging Face
+        if [[ "$model_url" == *"huggingface.co"* ]]; then
+            echo "Attempting to download from Hugging Face using huggingface-cli..."
+            # Extrage repo-id și filename pentru huggingface-cli
+            # Această logică se bazează pe formatul URL-urilor tale:
+            # https://huggingface.co/<repo_id>/resolve/main/<filename>
+            
+            # Use a regex that can handle both 'resolve' and 'blob' paths and extract the full repo_id
+            local repo_id_match=$(echo "$model_url" | sed -E 's|https://huggingface.co/([^/]+/[^/]+)/.*|\1|')
+            local filename_hf=$(echo "$model_url" | sed -E 's|.*/([^/]+\.[a-zA-Z0-9]+)$|\1|') # Extrage numele fișierului cu extensie
+
+            if [[ -n "$repo_id_match" && -n "$filename_hf" ]]; then
+                echo "Using huggingface-cli: repo-id='${repo_id_match}', filename='${filename_hf}', local-dir='${dest_dir}'"
+                huggingface-cli download --repo-id "$repo_id_match" --filename "$filename_hf" --local-dir "$dest_dir" --local-dir-use-symlinks False
+                
+                if [ $? -eq 0 ]; then
+                    echo "Download complete for ${output_filename} using huggingface-cli."
+                else
+                    echo "Error downloading ${output_filename} using huggingface-cli." >&2
+                    echo "Huggingface-cli download failed. It might be due to missing login or specific model access restrictions." >&2
+                fi
+            else
+                echo "ERROR: Could not parse Hugging Face URL for repo_id and filename. Falling back to aria2c." >&2
+                # Fallback to aria2c if parsing fails
+                aria2c \
+                    -c -x 16 -s 16 \
+                    -d "${dest_dir}" -o "${output_filename}" \
+                    --console-log-level=warn --summary-interval=0 \
+                    "${model_url}"
+                if [ $? -eq 0 ]; then
+                    echo "Download complete for ${output_filename} using aria2c (fallback)."
+                else
+                    echo "Error downloading ${output_filename} using aria2c (fallback)." >&2
+                fi
+            fi
         else
-            echo "Error downloading ${output_filename}." >&2
+            echo "Downloading using aria2c (non-Hugging Face URL)..."
+            aria2c \
+                -c -x 16 -s 16 \
+                -d "${dest_dir}" -o "${output_filename}" \
+                --console-log-level=warn --summary-interval=0 \
+                "${model_url}"
+            if [ $? -eq 0 ]; then
+                echo "Download complete for ${output_filename}."
+            else
+                echo "Error downloading ${output_filename}." >&2
+            fi
         fi
     fi
 }
@@ -73,7 +112,7 @@ echo "Downloading Flux models..."
 # UNET
 download_model_with_check "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors" "$UNET_DIR"
 
-# CLIP 
+# CLIP
 download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" "$CLIP_DIR"
 download_model_with_check "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" "$CLIP_DIR"
 
