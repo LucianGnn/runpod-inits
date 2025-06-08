@@ -44,5 +44,6 @@ fi
 #     echo "Warning: download_models_flux_dex.sh reported an error."
 # fi
 
-
+cd /workspace
+./run_gpu.sh
 echo "All custom initialization scripts completed."
