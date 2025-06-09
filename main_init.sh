@@ -55,6 +55,5 @@ fi
 
 
 ./start.sh
-cd /workspace
-./run_gpu.sh
+
 echo "All custom initialization scripts completed."
