@@ -2,17 +2,18 @@
 
 echo "Starting download_models_fantasy_talking.sh..."
 
-# Asigură-te că venv-ul ComfyUI este activat.
-# Notă: Această verificare '$?' ar trebui să fie după o comandă care setează venv-ul,
-# de obicei 'source /path/to/venv/bin/activate'.
-# Presupunem că venv-ul este activat anterior de main_init.sh.
-# Dacă nu, poți decomenta și adăuga aici:
-# source /workspace/ComfyUI/venv/bin/activate
-# if [ $? -ne 0 ]; then
-#     echo "ERROR: Failed to activate ComfyUI venv in download_models_fantasy_talking.sh. Exiting."
-#     exit 1
-# fi
-echo "ComfyUI venv activated." # Acest mesaj se bazează pe activarea venv-ului înainte de apelul acestui script.
+# Verifică și activează venv-ul dacă nu este deja activ
+if [[ -z "$VIRTUAL_ENV" ]]; then
+    echo "Activating ComfyUI venv..."
+    source /workspace/ComfyUI/venv/bin/activate
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to activate ComfyUI venv. Exiting."
+        exit 1
+    fi
+else
+    echo "ComfyUI venv already activated."
+fi
+
 
 # Asigură-te că aria2c este instalat.
 echo "Checking/Installing aria2c..."
@@ -116,7 +117,7 @@ echo "Downloading fantasytalking models..."
 # # --- Apelurile funcției pentru fiecare model ---
 
 #Fantasy talking
-download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/blob/main/fantasytalking_fp16.safetensors" "$DIFFUSION_MODELS_DIR"  
+download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/fantasytalking_fp16.safetensors" "$DIFFUSION_MODELS_DIR"  
 download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B-720P_fp8_e4m3fn.safetensors" "$DIFFUSION_MODELS_DIR" 
 
 # CLIP Vision
