@@ -118,7 +118,7 @@ echo "Downloading fantasytalking models..."
 
 #Fantasy talking
 download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/fantasytalking_fp16.safetensors" "$DIFFUSION_MODELS_DIR"  
-download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B-720P_fp8_e4m3fn.safetensors" "$DIFFUSION_MODELS_DIR" 
+download_model_with_check "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Skyreels/Wan2_1-SkyReels-V2-I2V-14B-720P_fp16.safetensors" "$DIFFUSION_MODELS_DIR" 
 
 # CLIP Vision
 download_model_with_check "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors" "$CLIP_VISION_DIR"
