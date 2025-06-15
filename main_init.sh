@@ -21,12 +21,12 @@ echo "ComfyUI venv activated."
 # fi
 
 
-# echo "Running download_models_fantasy_talking.sh (Model Download)..."
-# # Folosim calea corectă către scriptul download_models_fantasy_talking.sh
-# "${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
-# if [ $? -ne 0 ]; then
-#     echo "Warning: download_models_fantasy_talking.sh reported an error."
-# fi
+echo "Running download_models_fantasy_talking.sh (Model Download)..."
+# Folosim calea corectă către scriptul download_models_fantasy_talking.sh
+"${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
+if [ $? -ne 0 ]; then
+    echo "Warning: download_models_fantasy_talking.sh reported an error."
+fi
 
 #---------------------------------- FLUX DEV
 # echo "Running download_models_flux_dex.sh (Model Download)..."
@@ -46,12 +46,12 @@ echo "ComfyUI venv activated."
 
 
 # -----------------------------------Framepack
-echo "Running download_models_framepack.sh (Model Download)..."
-# Folosim calea corectă către scriptul download_models_flux_dex.sh
-"${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
-if [ $? -ne 0 ]; then
-    echo "Warning: download_models_framepack.sh reported an error."
-fi
+# echo "Running download_models_framepack.sh (Model Download)..."
+# # Folosim calea corectă către scriptul download_models_flux_dex.sh
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_framepack.sh reported an error."
+# fi
 
 
 ./start.sh
