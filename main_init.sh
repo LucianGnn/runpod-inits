@@ -35,25 +35,25 @@ if [ $? -ne 0 ]; then
 fi
 
 #---------------------------------- FLUX DEV
-# echo "Running download_models_flux_dev.sh (Model Download)..."
-# "${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dev.sh
-# if [ $? -ne 0 ]; then
-#     echo "Warning: download_models_flux_dev.sh reported an error."
-# fi
+echo "Running download_models_flux_dev.sh (Model Download)..."
+"${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dev.sh
+if [ $? -ne 0 ]; then
+    echo "Warning: download_models_flux_dev.sh reported an error."
+fi
 
 # -----------------------------------LTXV
-# echo "Running download_models_ltxv13b.sh (Model Download)..."
-# "${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
-# if [ $? -ne 0 ]; then
-#     echo "Warning: download_models_ltxv13b.sh reported an error."
-# fi
+echo "Running download_models_ltxv13b.sh (Model Download)..."
+"${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
+if [ $? -ne 0 ]; then
+    echo "Warning: download_models_ltxv13b.sh reported an error."
+fi
 
 # -----------------------------------Framepack
-# echo "Running download_models_framepack.sh (Model Download)..."
-# "${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
-# if [ $? -ne 0 ]; then
-#     echo "Warning: download_models_framepack.sh reported an error."
-# fi
+echo "Running download_models_framepack.sh (Model Download)..."
+"${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
+if [ $? -ne 0 ]; then
+    echo "Warning: download_models_framepack.sh reported an error."
+fi
 
 # La sfârșit, verifică dacă să pornească ComfyUI
 if [ -d "/workspace/ComfyUI" ] && [ -f "/workspace/ComfyUI/main.py" ]; then
