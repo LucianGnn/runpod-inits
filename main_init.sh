@@ -45,29 +45,36 @@ fi
 #     echo "Warning: install_nodes.sh reported an error. Continuing initialization."
 # fi
 
-echo "Running download_models_fantasy_talking.sh (Model Download)..."
-"${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
-if [ $? -ne 0 ]; then
-    echo "Warning: download_models_fantasy_talking.sh reported an error."
-fi
+# echo "Running download_models_fantasy_talking.sh (Model Download)..."
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_fantasy_talking.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_fantasy_talking.sh reported an error."
+# fi
 
-#---------------------------------- FLUX DEV
-echo "Running download_models_flux_dev.sh (Model Download)..."
-"${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dev.sh
-if [ $? -ne 0 ]; then
-    echo "Warning: download_models_flux_dev.sh reported an error."
-fi
+# #---------------------------------- FLUX DEV
+# echo "Running download_models_flux_dev.sh (Model Download)..."
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_flux_dev.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_flux_dev.sh reported an error."
+# fi
 
-# -----------------------------------LTXV
-echo "Running download_models_ltxv13b.sh (Model Download)..."
-"${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
-if [ $? -ne 0 ]; then
-    echo "Warning: download_models_ltxv13b.sh reported an error."
-fi
+# # -----------------------------------LTXV
+# echo "Running download_models_ltxv13b.sh (Model Download)..."
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_ltxv13b.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_ltxv13b.sh reported an error."
+# fi
+
+# # -----------------------------------Framepack
+# echo "Running download_models_framepack.sh (Model Download)..."
+# "${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
+# if [ $? -ne 0 ]; then
+#     echo "Warning: download_models_framepack.sh reported an error."
+# fi
 
 # -----------------------------------Framepack
 echo "Running download_models_framepack.sh (Model Download)..."
-"${CUSTOM_SCRIPTS_DIR}"/download_models_framepack.sh
+"${CUSTOM_SCRIPTS_DIR}"/download_models_sonic.sh
 if [ $? -ne 0 ]; then
     echo "Warning: download_models_framepack.sh reported an error."
 fi
