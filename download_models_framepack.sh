@@ -2,17 +2,20 @@
 
 echo "Starting download_models_framepack.sh..."
 
+# !!!IMPORTANT!!! Set your Hugging Face token here
+# Get your token from: https://huggingface.co/settings/tokens
+export HF_TOKEN="hf_your_actual_token_here"  # Replace with your actual token
+
+# Verify HF_TOKEN is set
+if [[ -z "$HF_TOKEN" || "$HF_TOKEN" == "hf_your_actual_token_here" ]]; then
+    echo "ERROR: HF_TOKEN is not set or still contains placeholder value!"
+    echo "Please set your Hugging Face token in the script or as an environment variable."
+    echo "Get your token from: https://huggingface.co/settings/tokens"
+    exit 1
+fi
+
 # Asigură-te că venv-ul ComfyUI este activat.
-# Notă: Această verificare '$?' ar trebui să fie după o comandă care setează venv-ul,
-# de obicei 'source /path/to/venv/bin/activate'.
-# Presupunem că venv-ul este activat anterior de main_init.sh.
-# Dacă nu, poți decomenta și adăuga aici:
-# source /workspace/ComfyUI/venv/bin/activate
-# if [ $? -ne 0 ]; then
-#     echo "ERROR: Failed to activate ComfyUI venv in download_models_framepack_dev.sh. Exiting."
-#     exit 1
-# fi
-echo "ComfyUI venv activated." # Acest mesaj se bazează pe activarea venv-ului înainte de apelul acestui script.
+echo "ComfyUI venv activated."
 
 # Asigură-te că aria2c este instalat.
 echo "Checking/Installing aria2c..."
@@ -36,9 +39,7 @@ LORAS_DIR="${COMFYUI_MODELS_BASE}/loras"
 UNET_DIR="${COMFYUI_MODELS_BASE}/unet"
 VAE_DIR="${COMFYUI_MODELS_BASE}/vae"
 
-
 # --- Funcție pentru descărcarea modelelor cu verificare și extragere nume fișier ---
-# Parametri: $1 = URL-ul modelului, $2 = Directorul de destinație complet (ex: $DIFFUSION_MODELS_DIR)
 download_model_with_check() {
     local model_url="$1"
     local dest_dir="$2"
@@ -66,16 +67,36 @@ download_model_with_check() {
                 # Activăm mediul virtual Python al ComfyUI
                 source /workspace/ComfyUI/venv/bin/activate
                 
+                # Install huggingface_hub if not present
+                pip install -q huggingface_hub
+                
                 # Apelăm funcția Python hf_hub_download direct din linia de comandă
-                # Aceasta va folosi automat HF_TOKEN din variabilele de mediu
-                python -c "from huggingface_hub import hf_hub_download; import os; os.makedirs('${dest_dir}', exist_ok=True); hf_hub_download(repo_id='${repo_id_match}', filename='${filename_hf}', local_dir='${dest_dir}', local_dir_use_symlinks=False, resume_download=True)"
+                # Cu token explicit pentru autentificare
+                python -c "
+import os
+from huggingface_hub import hf_hub_download
+try:
+    os.makedirs('${dest_dir}', exist_ok=True)
+    hf_hub_download(
+        repo_id='${repo_id_match}', 
+        filename='${filename_hf}', 
+        local_dir='${dest_dir}', 
+        local_dir_use_symlinks=False, 
+        resume_download=True,
+        token='${HF_TOKEN}'
+    )
+    print('SUCCESS: Download completed')
+except Exception as e:
+    print(f'ERROR: {e}')
+    exit(1)
+"
                 
                 if [ $? -eq 0 ]; then
                     echo "Download complete for ${output_filename} using direct Python call."
                     python_download_success=true
                 else
                     echo "Error downloading ${output_filename} using direct Python call." >&2
-                    echo "Python download failed. It might be due to missing HF_TOKEN or specific model access restrictions." >&2
+                    echo "Make sure you have access to the model and your HF_TOKEN is valid." >&2
                 fi
             else
                 echo "ERROR: Could not parse Hugging Face URL for repo_id and filename for ${output_filename}." >&2
@@ -88,6 +109,7 @@ download_model_with_check() {
                     -c -x 16 -s 16 \
                     -d "${dest_dir}" -o "${output_filename}" \
                     --console-log-level=warn --summary-interval=0 \
+                    --header="Authorization: Bearer ${HF_TOKEN}" \
                     "${model_url}"
                 if [ $? -eq 0 ]; then
                     echo "Download complete for ${output_filename} using aria2c fallback."
@@ -113,14 +135,13 @@ download_model_with_check() {
 
 echo "Downloading framepack models..."
 
-# # --- Apelurile funcției pentru fiecare model ---
+# --- Apelurile funcției pentru fiecare model ---
 
-#IFFUSION_MODELS_DIR
+# DIFFUSION_MODELS_DIR
 download_model_with_check "https://huggingface.co/Kijai/HunyuanVideo_comfy/resolve/main/FramePackI2V_HY_fp8_e4m3fn.safetensors" "$DIFFUSION_MODELS_DIR"  #16 gb
 
-# CLIP
+# CLIP Vision
 download_model_with_check "https://huggingface.co/Comfy-Org/sigclip_vision_384/resolve/main/sigclip_vision_patch14_384.safetensors" "$CLIP_VISION_DIR"
-
 
 # VAE
 download_model_with_check "https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged/resolve/main/split_files/vae/hunyuan_video_vae_bf16.safetensors" "$VAE_DIR"
@@ -129,5 +150,4 @@ download_model_with_check "https://huggingface.co/Comfy-Org/HunyuanVideo_repacka
 download_model_with_check "https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged/resolve/main/split_files/text_encoders/llava_llama3_fp16.safetensors" "$TEXT_ENCODERS_DIR"
 download_model_with_check "https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged/resolve/main/split_files/text_encoders/clip_l.safetensors" "$TEXT_ENCODERS_DIR"
 
-
-echo "download_models_framepack_dev.sh completed."
+echo "download_models_framepack.sh completed."
