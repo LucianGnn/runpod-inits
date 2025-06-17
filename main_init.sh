@@ -1,5 +1,23 @@
 #!/bin/bash
+
 echo "Starting main_init.sh - Orchestrating custom setup."
+
+# !!!IMPORTANT!!! Set your Hugging Face token here ONCE for all scripts
+# Get your token from: https://huggingface.co/settings/tokens
+
+
+export HF_TOKEN="hf_your_actual_token_here"  # Replace with your actual token
+
+# Verify HF_TOKEN is set
+if [[ -z "$HF_TOKEN" || "$HF_TOKEN" == "hf_your_actual_token_here" ]]; then
+    echo "ERROR: HF_TOKEN is not set or still contains placeholder value!"
+    echo "Please set your Hugging Face token in main_init.sh"
+    echo "Get your token from: https://huggingface.co/settings/tokens"
+    exit 1
+fi
+
+echo "HF_TOKEN configured - will be passed to all download scripts."
+
 CUSTOM_SCRIPTS_DIR="/workspace/runpod-inits"
 
 # Instalează biblioteca huggingface_hub (necesară pentru apelul Python de download)
@@ -8,7 +26,6 @@ pip install huggingface_hub
 
 # VERIFICĂ dacă ComfyUI și venv există înainte să încerci să activezi
 COMFY_VENV="/workspace/ComfyUI/venv/bin/activate"
-
 if [ -f "$COMFY_VENV" ]; then
     echo "ComfyUI venv found, activating..."
     source "$COMFY_VENV"
