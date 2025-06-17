@@ -10,16 +10,15 @@ if [ $? -ne 0 ]; then
 fi
 echo "ComfyUI venv activated."
 
-
 # Install APT packages
 echo "Installing APT packages..."
-# ATENTIE: Am ELIMINAT 'sudo' de aici, deoarece nu functioneaza pe RunPod
-apt-get update # Necessar pentru a actualiza lista de pachete disponibile
+apt-get update
+
 # Verificare și instalare aria2
 if ! command -v aria2c &> /dev/null; then
     echo "aria2c not found, installing..."
-    # ATENTIE: Am ELIMINAT 'sudo' de aici
     apt-get -y install aria2
+    hash -r # Refresh command hash table
 else
     echo "aria2c is already installed."
 fi
@@ -27,6 +26,7 @@ fi
 # Define PIP packages (pachete PIP globale, nu specifice nodurilor)
 PIP_PACKAGES=(
     "huggingface_hub"
+    "gitpython"  # Useful for git operations
 )
 
 echo "Installing global PIP packages..."
@@ -58,6 +58,9 @@ NODES=(
     "https://github.com/MinorBoy/ComfyUI_essentials_mb"
 )
 
+# Create custom_nodes directory if it doesn't exist
+mkdir -p "/workspace/ComfyUI/custom_nodes"
+
 # --- MODIFICARE PENTRU A INSTALA REQUIREMENTS DOAR LA PRIMA CLONARE ---
 TEMP_REQUIREMENTS_FILE="/tmp/all_comfyui_requirements.txt"
 > "$TEMP_REQUIREMENTS_FILE"
@@ -73,16 +76,33 @@ for repo in "${NODES[@]}"; do
 
     if [[ -d "$path" ]]; then
         echo "Node '${dir}' already exists. Updating (git pull)..."
-        ( cd "$path" && git pull origin main || git pull origin master ) # <--- MODIFICARE AICI
-        if [ $? -ne 0 ]; then
-            echo "Warning: git pull failed for node '${dir}'. It might be in a detached HEAD state or on an unusual branch." >&2
+        cd "$path"
+        
+        # Get current branch name
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        
+        # Try to pull from current branch first, then fallback to main/master
+        if [[ "$current_branch" != "HEAD" && -n "$current_branch" ]]; then
+            git pull origin "$current_branch" 2>/dev/null || \
+            git pull origin main 2>/dev/null || \
+            git pull origin master 2>/dev/null || \
+            echo "Warning: git pull failed for node '${dir}'. Branch might be detached or protected."
+        else
+            git pull origin main 2>/dev/null || \
+            git pull origin master 2>/dev/null || \
+            echo "Warning: git pull failed for node '${dir}'. Repository might be in detached HEAD state."
         fi
-        # AICI, DACĂ NODUL EXISTA DEJA, NU MAI COLECTĂM CERINȚELE LUI PENTRU INSTALARE.
-        # RISC: Dacă requirements.txt se schimbă ulterior, nu se vor instala noile dependențe.
+        
+        cd - > /dev/null  # Return to previous directory silently
     else
         echo "Node '${dir}' not found. Cloning: ${repo} to ${path} (--recursive)..."
-        git clone "${repo}" "${path}" --recursive
-        WAS_CLONED_NOW=true # Nodul a fost clonat, deci colectăm cerințele
+        if git clone "${repo}" "${path}" --recursive; then
+            WAS_CLONED_NOW=true # Nodul a fost clonat, deci colectăm cerințele
+            echo "Successfully cloned ${dir}"
+        else
+            echo "Warning: Failed to clone ${dir} from ${repo}"
+            continue
+        fi
     fi
 
     # Colectează cerințele doar dacă nodul a fost clonat acum (instalare inițială)
@@ -92,15 +112,31 @@ for repo in "${NODES[@]}"; do
     fi
 done
 
+# Remove duplicate requirements and clean up the file
+if [[ -s "$TEMP_REQUIREMENTS_FILE" ]]; then
+    echo "Processing consolidated requirements..."
+    # Remove duplicates, empty lines, and comments
+    sort "$TEMP_REQUIREMENTS_FILE" | uniq | grep -v '^#' | grep -v '^$' > "${TEMP_REQUIREMENTS_FILE}.clean"
+    mv "${TEMP_REQUIREMENTS_FILE}.clean" "$TEMP_REQUIREMENTS_FILE"
+fi
+
 # Instalează toate cerințele consolidate O SINGURĂ DATĂ (doar cele colectate din nodurile recent clonate)
 if [[ -s "$TEMP_REQUIREMENTS_FILE" ]]; then
     echo "Installing consolidated requirements for newly cloned custom nodes..."
+    echo "Requirements to install:"
+    cat "$TEMP_REQUIREMENTS_FILE"
+    
     pip install --no-cache-dir -r "$TEMP_REQUIREMENTS_FILE"
-    if [ $? -ne 0 ]; then
-        echo "Warning: Failed to install consolidated requirements for newly cloned custom nodes."
+    if [ $? -eq 0 ]; then
+        echo "Successfully installed all requirements."
+    else
+        echo "Warning: Some requirements failed to install. This might not affect functionality."
     fi
+    
+    # Clean up temp file
+    rm -f "$TEMP_REQUIREMENTS_FILE"
 else
     echo "No new custom nodes cloned or no requirements files found for them."
 fi
 
-echo "install_nodes.sh completed."
+echo "install_nodes.sh completed successfully."
