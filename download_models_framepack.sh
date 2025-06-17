@@ -2,17 +2,16 @@
 
 echo "Starting download_models_framepack.sh..."
 
-# !!!IMPORTANT!!! Set your Hugging Face token here
-# Get your token from: https://huggingface.co/settings/tokens
-export HF_TOKEN="hf_your_actual_token_here"  # Replace with your actual token
-
-# Verify HF_TOKEN is set
-if [[ -z "$HF_TOKEN" || "$HF_TOKEN" == "hf_your_actual_token_here" ]]; then
-    echo "ERROR: HF_TOKEN is not set or still contains placeholder value!"
-    echo "Please set your Hugging Face token in the script or as an environment variable."
-    echo "Get your token from: https://huggingface.co/settings/tokens"
+# Check if HF_TOKEN was passed from parent script
+if [[ -z "$HF_TOKEN" ]]; then
+    echo "ERROR: HF_TOKEN not found in environment!"
+    echo "This script should be called from main_init.sh or you need to set HF_TOKEN manually."
+    echo "If running standalone, uncomment and set the token below:"
+    # export HF_TOKEN="hf_your_actual_token_here"
     exit 1
 fi
+
+echo "Using HF_TOKEN from environment for authentication."
 
 # Asigură-te că venv-ul ComfyUI este activat.
 echo "ComfyUI venv activated."
