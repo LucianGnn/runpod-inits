@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Compact RunPod bootstrap — ComfyUI + IndexTTS-2 + optional nodes
-# Reads env:
-#   HF_TOKEN                (optional; will be persisted at $WORKSPACE/HF_TOKEN)
-#   INSTALL_NODES_URL       (optional; raw URL to install_nodes.sh)
-#   NODES_FILE              (optional; default $WORKSPACE/nodes.txt)
-#   EXTRA_NODES             (optional; space-separated "user/repo user/repo ...")
-#   WORKSPACE               (optional; default /workspace)
+# Compact RunPod bootstrap — ComfyUI + IndexTTS-2 (+ optional nodes)
+# Env:
+#   HF_TOKEN              (optional; will be persisted at $WORKSPACE/HF_TOKEN)
+#   INSTALL_NODES_URL     (optional; raw URL to install_nodes.sh)
+#   NODES_FILE            (optional; default $WORKSPACE/nodes.txt)
+#   EXTRA_NODES           (optional; space-separated "user/repo user/repo ...")
+#   TTS2_PROMPT_CHOICE    (optional; 1=HF official [default], 2=mirror)
+#   WORKSPACE             (optional; default /workspace)
 # Starts ComfyUI on 0.0.0.0:8188
 
 WORKSPACE="${WORKSPACE:-/workspace}"
@@ -22,7 +23,7 @@ export DS_BUILD_OPS=0
 
 mkdir -p "$WORKSPACE"
 
-# Save HF token for reuse
+# HF token reuse
 if [ -z "${HF_TOKEN:-}" ] && [ -f "$WORKSPACE/HF_TOKEN" ]; then
   export HF_TOKEN="$(cat "$WORKSPACE/HF_TOKEN")"
 fi
@@ -31,7 +32,7 @@ fi
 # OS deps (best effort)
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -y || true
-  apt-get install -y git python3-venv python3-dev build-essential ffmpeg aria2 curl ca-certificates || true
+  apt-get install -y git python3-venv python3-dev build-essential ffmpeg aria2 curl ca-certificates libgl1 libglib2.0-0 || true
 fi
 
 # Clone/Update ComfyUI
@@ -67,11 +68,16 @@ else
 fi
 [ -f "$NODE_TTS/requirements.txt" ] && pip install -r "$NODE_TTS/requirements.txt" --progress-bar off || true
 
-# HF login + persist env
-python -m pip install -U huggingface_hub --progress-bar off
-if [ -n "${HF_TOKEN:-}" ]; then
-  huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential -y || true
-fi
+# HF login (Python, non-interactive) + transfer accel
+python -m pip install -U huggingface_hub hf_transfer --progress-bar off
+python - <<'PY' || true
+import os
+from huggingface_hub import login
+tok=os.getenv("HF_TOKEN")
+print("HF login: token missing -> skip") if not tok else login(token=tok, add_to_git_credential=True)
+PY
+
+# Persist HF env
 mkdir -p "$MODEL_ROOT/hf_cache"
 HF_ENV="$VENV/hf.env"
 cat > "$HF_ENV" <<EOF
@@ -83,14 +89,37 @@ export DS_BUILD_OPS=0
 EOF
 grep -q "hf.env" "$VENV/bin/activate" || echo 'test -f "${VIRTUAL_ENV}/hf.env" && . "${VIRTUAL_ENV}/hf.env"' >> "$VENV/bin/activate"
 
-# Download IndexTTS-2 models (if not present)
+# Download IndexTTS-2 models (non-interactive)
 if [ ! -f "$MODEL_ROOT/semantic_codec/model.safetensors" ]; then
-  mkdir -p "$COMFY/scripts"
-  if [ ! -f "$COMFY/scripts/TTS2_download.py" ]; then
+  CHOICE="${TTS2_PROMPT_CHOICE:-1}"  # 1=HF official (default), 2=mirror
+  if [ -f "$NODE_TTS/TTS2_download.py" ]; then
+    ( export HF_HOME="$MODEL_ROOT/hf_cache" HF_HUB_ENABLE_HF_TRANSFER=1; printf "%s\n" "$CHOICE" | python "$NODE_TTS/TTS2_download.py" ) || true
+  else
+    # fallback: fetch script from upstream
+    mkdir -p "$COMFY/scripts"
     curl -fsSL https://raw.githubusercontent.com/chenpipi0807/ComfyUI-Index-TTS/main/TTS2_download.py -o "$COMFY/scripts/TTS2_download.py"
+    ( cd "$COMFY/scripts" && export HF_HOME="$MODEL_ROOT/hf_cache" HF_HUB_ENABLE_HF_TRANSFER=1; printf "%s\n" "$CHOICE" | python TTS2_download.py ) || true
   fi
-  ( cd "$COMFY/scripts" && HF_HOME="$MODEL_ROOT/hf_cache" HF_HUB_ENABLE_HF_TRANSFER=1 printf "1\n" | python TTS2_download.py ) || true
 fi
+
+# Ensure base files (handles your FileNotFoundError case)
+python - <<'PY' || true
+import pathlib
+from huggingface_hub import snapshot_download
+dst="/workspace/ComfyUI/models/IndexTTS-2"
+need=["bpe.model","config.yaml","feat1.pt","feat2.pt","gpt.pth","s2mel.pth","wav2vec2bert_stats.pt","campplus_cn_common.bin"]
+p=pathlib.Path(dst); p.mkdir(parents=True, exist_ok=True)
+missing=[f for f in need if not (p/f).exists()]
+if missing:
+    snapshot_download(repo_id="IndexTeam/IndexTTS-2", allow_patterns=need,
+                      local_dir=dst, local_dir_use_symlinks=False, resume_download=True)
+    print("Ensured IndexTTS-2 base files.")
+else:
+    print("IndexTTS-2 base files already present.")
+PY
+
+# Fallback: if some other script downloaded to /workspace/models/IndexTTS-2, link it
+[ -d /workspace/models/IndexTTS-2 ] && [ ! -e "$MODEL_ROOT" ] && ln -s /workspace/models/IndexTTS-2 "$MODEL_ROOT" || true
 
 # Optional: install additional nodes via install_nodes.sh
 FETCHED=""
