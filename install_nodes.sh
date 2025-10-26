@@ -46,16 +46,17 @@ done
 NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
     "https://github.com/crystian/ComfyUI-Crystools"
-    "https://github.com/kijai/ComfyUI-WanVideoWrapper"
-    "https://github.com/Lightricks/ComfyUI-LTXVideo"
     "https://github.com/rgthree/rgthree-comfy"
-    "https://github.com/XLabs-AI/x-flux-comfyui"
-    "https://github.com/kijai/ComfyUI-KJNodes"
-    "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
-    "https://github.com/justUmen/Bjornulf_custom_nodes"
-    "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
-    "https://github.com/christian-byrne/audio-separation-nodes-comfyui"
-    "https://github.com/MinorBoy/ComfyUI_essentials_mb"
+    "https://github.com/kk8bit/KayTool"
+    #"https://github.com/XLabs-AI/x-flux-comfyui"
+    #"https://github.com/kijai/ComfyUI-WanVideoWrapper"
+    #"https://github.com/Lightricks/ComfyUI-LTXVideo"
+    #"https://github.com/kijai/ComfyUI-KJNodes"
+    #"https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
+    #"https://github.com/justUmen/Bjornulf_custom_nodes"
+    #"https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
+    #"https://github.com/christian-byrne/audio-separation-nodes-comfyui"
+    #"https://github.com/MinorBoy/ComfyUI_essentials_mb"
 )
 
 # Create custom_nodes directory if it doesn't exist
