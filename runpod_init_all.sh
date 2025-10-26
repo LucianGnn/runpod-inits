@@ -13,7 +13,7 @@ set -euo pipefail
 #   # Overrides for HF asset dataset and names (defaults match your repo):
 #   ASSET_DATASET         (default: LucianGn/IndexTTS2)
 #   WF_NAME               (default: IndexTTS2.json)
-#   AUDIO1_NAME           (default: emoji ref.mp3)
+#   AUDIO1_NAME           (default: emoji_ref.mp3)
 #   AUDIO2_NAME           (default: morph.wav)
 # Starts ComfyUI on 0.0.0.0:8188
 
@@ -135,7 +135,7 @@ PY
 ASSET_DATASET="${ASSET_DATASET:-LucianGn/IndexTTS2}"
 HF_REV="${HF_REV:-main}"
 WF_NAME="${WF_NAME:-IndexTTS2.json}"
-AUDIO1_NAME="${AUDIO1_NAME:-emoji ref.mp3}"
+AUDIO1_NAME="${AUDIO1_NAME:-emoji_ref.mp3}"
 AUDIO2_NAME="${AUDIO2_NAME:-morph.wav}"
 
 python - <<'PY' || true
@@ -145,7 +145,7 @@ repo = os.getenv("ASSET_DATASET","LucianGn/IndexTTS2")
 rev  = os.getenv("HF_REV","main")
 items = [
   (os.getenv("WF_NAME","IndexTTS2.json"), "/workspace/ComfyUI/user/default/workflows"),
-  (os.getenv("AUDIO1_NAME","emoji ref.mp3"), "/workspace/ComfyUI/input"),
+  (os.getenv("AUDIO1_NAME","emoji_ref.mp3"), "/workspace/ComfyUI/input"),
   (os.getenv("AUDIO2_NAME","morph.wav"), "/workspace/ComfyUI/input"),
 ]
 for name, folder in items:
