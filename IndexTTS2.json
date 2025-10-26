@@ -1,0 +1,704 @@
+{
+  "id": "20cfcab8-7b7c-44e8-aeeb-838142c8828d",
+  "revision": 0,
+  "last_node_id": 53,
+  "last_link_id": 48,
+  "nodes": [
+    {
+      "id": 48,
+      "type": "CR Seed",
+      "pos": [
+        -6151.83055267601,
+        -1550.8322754605924
+      ],
+      "size": [
+        210,
+        102
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "seed",
+          "type": "INT",
+          "links": [
+            48
+          ]
+        },
+        {
+          "name": "show_help",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "ComfyUI_Comfyroll_CustomNodes",
+        "ver": "d78b780ae43fcf8c6b7c6505e6ffb4584281ceca",
+        "Node name for S&R": "CR Seed"
+      },
+      "widgets_values": [
+        390754207069621,
+        "randomize"
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 33,
+      "type": "Text",
+      "pos": [
+        -6706.8617202661135,
+        -1975.5678642384191
+      ],
+      "size": [
+        760.5079001076637,
+        367.4064334432153
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "title": "Text For TTS",
+      "properties": {
+        "aux_id": "kk8bit/KayTool",
+        "ver": "f4c80b009194d51a13a94f06d37847110a174c52",
+        "Node name for S&R": "Text"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 32,
+      "type": "SaveAudio",
+      "pos": [
+        -5698.510379853252,
+        -1729.6500097654243
+      ],
+      "size": [
+        270,
+        112
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 47
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.66",
+        "Node name for S&R": "SaveAudio"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#323",
+      "bgcolor": "#535"
+    },
+    {
+      "id": 47,
+      "type": "27c3bb6b-bc79-4b3b-b720-842ccfae4ff0",
+      "pos": [
+        -5922.49851167457,
+        -1729.6500097654243
+      ],
+      "size": [
+        210,
+        208
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 45
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 48
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            47
+          ]
+        }
+      ],
+      "properties": {
+        "proxyWidgets": [
+          [
+            "-1",
+            "text"
+          ],
+          [
+            "-1",
+            "temperature"
+          ],
+          [
+            "-1",
+            "top_p"
+          ],
+          [
+            "-1",
+            "top_k"
+          ],
+          [
+            "-1",
+            "emotion_weight"
+          ],
+          [
+            "-1",
+            "seed"
+          ]
+        ],
+        "cnr_id": "comfy-core",
+        "ver": "0.3.66"
+      },
+      "widgets_values": [
+        "",
+        0.6,
+        0.9,
+        30,
+        0.7,
+        2764098651
+      ],
+      "color": "#323",
+      "bgcolor": "#535"
+    }
+  ],
+  "links": [
+    [
+      45,
+      33,
+      0,
+      47,
+      0,
+      "STRING"
+    ],
+    [
+      47,
+      47,
+      0,
+      32,
+      0,
+      "AUDIO"
+    ],
+    [
+      48,
+      48,
+      0,
+      47,
+      1,
+      "INT"
+    ]
+  ],
+  "groups": [],
+  "definitions": {
+    "subgraphs": [
+      {
+        "id": "27c3bb6b-bc79-4b3b-b720-842ccfae4ff0",
+        "version": 1,
+        "state": {
+          "lastGroupId": 0,
+          "lastNodeId": 41,
+          "lastLinkId": 39,
+          "lastRerouteId": 0
+        },
+        "revision": 0,
+        "config": {},
+        "name": "IndexTTS2 RefEmo",
+        "inputNode": {
+          "id": -10,
+          "bounding": [
+            -3553.544787310418,
+            -2241.785143755718,
+            124.052734375,
+            160
+          ]
+        },
+        "outputNode": {
+          "id": -20,
+          "bounding": [
+            -2684.302448269249,
+            -2241.785143755718,
+            120,
+            60
+          ]
+        },
+        "inputs": [
+          {
+            "id": "b8e5feaf-d7b6-488a-93ca-a5037e138872",
+            "name": "text",
+            "type": "STRING",
+            "linkIds": [
+              39
+            ],
+            "localized_name": "text",
+            "pos": [
+              -3449.492052935418,
+              -2221.785143755718
+            ]
+          },
+          {
+            "id": "c622c8b8-e4d6-4788-bbdf-beaa6f82b0c9",
+            "name": "temperature",
+            "type": "FLOAT",
+            "linkIds": [
+              33
+            ],
+            "pos": [
+              -3449.492052935418,
+              -2201.785143755718
+            ]
+          },
+          {
+            "id": "3f8c556d-06c4-4610-8a4c-7ee5fb7bbf52",
+            "name": "top_p",
+            "type": "FLOAT",
+            "linkIds": [
+              34
+            ],
+            "pos": [
+              -3449.492052935418,
+              -2181.785143755718
+            ]
+          },
+          {
+            "id": "8a260add-a496-42a5-b1f9-f50be483dab7",
+            "name": "top_k",
+            "type": "INT",
+            "linkIds": [
+              35
+            ],
+            "pos": [
+              -3449.492052935418,
+              -2161.785143755718
+            ]
+          },
+          {
+            "id": "863ba808-5af3-4589-bba6-0b4d1c72ca24",
+            "name": "emotion_weight",
+            "type": "FLOAT",
+            "linkIds": [
+              36
+            ],
+            "pos": [
+              -3449.492052935418,
+              -2141.785143755718
+            ]
+          },
+          {
+            "id": "167b6aea-4752-4cdc-af91-1f55a8490473",
+            "name": "seed",
+            "type": "INT",
+            "linkIds": [
+              38
+            ],
+            "pos": [
+              -3449.492052935418,
+              -2121.785143755718
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "id": "29fa19b8-667d-4a01-8459-960184cd0f8a",
+            "name": "audio",
+            "type": "AUDIO",
+            "linkIds": [
+              30
+            ],
+            "localized_name": "audio",
+            "pos": [
+              -2664.302448269249,
+              -2221.785143755718
+            ]
+          }
+        ],
+        "widgets": [],
+        "nodes": [
+          {
+            "id": 36,
+            "type": "IndexTTS2CacheControlNode",
+            "pos": [
+              -3371.987567222462,
+              -2237.0444030445833
+            ],
+            "size": [
+              220.748046875,
+              58
+            ],
+            "flags": {},
+            "order": 0,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "localized_name": "cache_control",
+                "name": "cache_control",
+                "type": "DICT",
+                "links": [
+                  28
+                ]
+              }
+            ],
+            "properties": {
+              "aux_id": "chenpipi0807/ComfyUI-Index-TTS",
+              "ver": "73a234a35c45bd3b7ddee0a4955ad56c7eb53753",
+              "Node name for S&R": "IndexTTS2CacheControlNode"
+            },
+            "widgets_values": [
+              true
+            ]
+          },
+          {
+            "id": 37,
+            "type": "LoadAudio",
+            "pos": [
+              -3283.7283897537773,
+              -2071.194219955398
+            ],
+            "size": [
+              214.080078125,
+              136
+            ],
+            "flags": {
+              "collapsed": true
+            },
+            "order": 1,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "localized_name": "AUDIO",
+                "name": "AUDIO",
+                "type": "AUDIO",
+                "links": [
+                  29
+                ]
+              }
+            ],
+            "title": "RefEmo",
+            "properties": {
+              "cnr_id": "comfy-core",
+              "ver": "0.3.66",
+              "Node name for S&R": "LoadAudio"
+            },
+            "widgets_values": [
+              "emoji ref.mp3",
+              null,
+              null
+            ]
+          },
+          {
+            "id": 35,
+            "type": "LoadAudio",
+            "pos": [
+              -3363.111238473523,
+              -2416.780129834372
+            ],
+            "size": [
+              214.080078125,
+              136
+            ],
+            "flags": {},
+            "order": 2,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "localized_name": "AUDIO",
+                "name": "AUDIO",
+                "type": "AUDIO",
+                "links": [
+                  27
+                ]
+              }
+            ],
+            "title": "RefVoice",
+            "properties": {
+              "cnr_id": "comfy-core",
+              "ver": "0.3.66",
+              "Node name for S&R": "LoadAudio"
+            },
+            "widgets_values": [
+              "morph.wav",
+              null,
+              null
+            ]
+          },
+          {
+            "id": 38,
+            "type": "IndexTTS2EmotionAudioNode",
+            "pos": [
+              -3144.3024482692485,
+              -2416.785143755717
+            ],
+            "size": [
+              400,
+              440
+            ],
+            "flags": {},
+            "order": 3,
+            "mode": 0,
+            "inputs": [
+              {
+                "localized_name": "reference_audio",
+                "name": "reference_audio",
+                "type": "AUDIO",
+                "link": 27
+              },
+              {
+                "localized_name": "cache_control",
+                "name": "cache_control",
+                "shape": 7,
+                "type": "DICT",
+                "link": 28
+              },
+              {
+                "localized_name": "emo_ref_audio",
+                "name": "emo_ref_audio",
+                "shape": 7,
+                "type": "AUDIO",
+                "link": 29
+              },
+              {
+                "localized_name": "text",
+                "name": "text",
+                "type": "STRING",
+                "widget": {
+                  "name": "text"
+                },
+                "link": 39
+              },
+              {
+                "localized_name": "temperature",
+                "name": "temperature",
+                "shape": 7,
+                "type": "FLOAT",
+                "widget": {
+                  "name": "temperature"
+                },
+                "link": 33
+              },
+              {
+                "localized_name": "top_p",
+                "name": "top_p",
+                "shape": 7,
+                "type": "FLOAT",
+                "widget": {
+                  "name": "top_p"
+                },
+                "link": 34
+              },
+              {
+                "localized_name": "top_k",
+                "name": "top_k",
+                "shape": 7,
+                "type": "INT",
+                "widget": {
+                  "name": "top_k"
+                },
+                "link": 35
+              },
+              {
+                "localized_name": "seed",
+                "name": "seed",
+                "shape": 7,
+                "type": "INT",
+                "widget": {
+                  "name": "seed"
+                },
+                "link": 38
+              },
+              {
+                "localized_name": "emotion_weight",
+                "name": "emotion_weight",
+                "shape": 7,
+                "type": "FLOAT",
+                "widget": {
+                  "name": "emotion_weight"
+                },
+                "link": 36
+              }
+            ],
+            "outputs": [
+              {
+                "localized_name": "audio",
+                "name": "audio",
+                "type": "AUDIO",
+                "links": [
+                  30
+                ]
+              },
+              {
+                "localized_name": "seed",
+                "name": "seed",
+                "type": "INT",
+                "links": []
+              },
+              {
+                "localized_name": "subtitle",
+                "name": "subtitle",
+                "type": "STRING",
+                "links": []
+              }
+            ],
+            "properties": {
+              "aux_id": "chenpipi0807/ComfyUI-Index-TTS",
+              "ver": "73a234a35c45bd3b7ddee0a4955ad56c7eb53753",
+              "Node name for S&R": "IndexTTS2EmotionAudioNode"
+            },
+            "widgets_values": [
+              "",
+              "Auto",
+              "on",
+              0.6,
+              0.9,
+              30,
+              3,
+              10,
+              0,
+              1815,
+              120,
+              2764098651,
+              "randomize",
+              0.7
+            ]
+          }
+        ],
+        "groups": [],
+        "links": [
+          {
+            "id": 27,
+            "origin_id": 35,
+            "origin_slot": 0,
+            "target_id": 38,
+            "target_slot": 0,
+            "type": "AUDIO"
+          },
+          {
+            "id": 28,
+            "origin_id": 36,
+            "origin_slot": 0,
+            "target_id": 38,
+            "target_slot": 1,
+            "type": "DICT"
+          },
+          {
+            "id": 29,
+            "origin_id": 37,
+            "origin_slot": 0,
+            "target_id": 38,
+            "target_slot": 2,
+            "type": "AUDIO"
+          },
+          {
+            "id": 30,
+            "origin_id": 38,
+            "origin_slot": 0,
+            "target_id": -20,
+            "target_slot": 0,
+            "type": "AUDIO"
+          },
+          {
+            "id": 33,
+            "origin_id": -10,
+            "origin_slot": 1,
+            "target_id": 38,
+            "target_slot": 4,
+            "type": "FLOAT"
+          },
+          {
+            "id": 34,
+            "origin_id": -10,
+            "origin_slot": 2,
+            "target_id": 38,
+            "target_slot": 5,
+            "type": "FLOAT"
+          },
+          {
+            "id": 35,
+            "origin_id": -10,
+            "origin_slot": 3,
+            "target_id": 38,
+            "target_slot": 6,
+            "type": "INT"
+          },
+          {
+            "id": 36,
+            "origin_id": -10,
+            "origin_slot": 4,
+            "target_id": 38,
+            "target_slot": 8,
+            "type": "FLOAT"
+          },
+          {
+            "id": 38,
+            "origin_id": -10,
+            "origin_slot": 5,
+            "target_id": 38,
+            "target_slot": 7,
+            "type": "INT"
+          },
+          {
+            "id": 39,
+            "origin_id": -10,
+            "origin_slot": 0,
+            "target_id": 38,
+            "target_slot": 3,
+            "type": "STRING"
+          }
+        ],
+        "extra": {}
+      }
+    ]
+  },
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9849732675807631,
+      "offset": [
+        7388.264992336526,
+        2102.101717085774
+      ]
+    },
+    "frontendVersion": "1.28.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
