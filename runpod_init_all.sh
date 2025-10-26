@@ -67,7 +67,8 @@ else
   (cd "$NODE_TTS" && git pull --ff-only || true)
 fi
 [ -f "$NODE_TTS/requirements.txt" ] && pip install -r "$NODE_TTS/requirements.txt" --progress-bar off || true
-
+# necesar pentru device_map/tp_plan din Transformers/ModelScope
+pip install -U accelerate --progress-bar off
 # HF login (Python, non-interactive) + transfer accel
 python -m pip install -U huggingface_hub hf_transfer --progress-bar off
 python - <<'PY' || true
