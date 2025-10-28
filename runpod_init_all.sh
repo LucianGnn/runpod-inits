@@ -1,130 +1,171 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# RunPod bootstrap — ComfyUI + TTS-Audio-Suite + (optional) IndexTTS-2
-# Env (set in Template):
-#   HF_TOKEN              (secret; necesar pt. dataset privat)
-#   WORKSPACE=/workspace  (implicit)
-#   ASSET_DATASET=LucianGn/IndexTTS2
-#   ASSET_SUBDIR=IndexTTS2          # dacă fișierele sunt într-un subfolder
-#   HF_REV=main
-#   AUTO_UPDATE=true
-#   BOOTSTRAP_RESET=0|1             # 1 = forțează rebuild
-#   # (IndexTTS-2 rămâne opțional; nu mai folosim TTS2_download.py)
+# RunPod bootstrap — ComfyUI + TTS-Audio-Suite + HF assets (+ optional IndexTTS-2 models)
+# ENV you can set in the template:
+#   WORKSPACE                (default: /workspace)
+#   HF_TOKEN                 (optional; required if HF dataset is private)
+#   INSTALL_TTS_SUITE        (default: 1)   install/update TTS-Audio-Suite node
+#   INSTALL_INDEXTTS2_MODELS (default: 0)   1 = fetch IndexTTS-2 models via HF (no .py)
+#   ASSETS_REFRESH           (default: 0)   1 = re-download workflow+voices every boot
+#   FORCE_REDO               (default: 0)   1 = redo heavy bootstrap (as if first boot)
+#   ASSET_DATASET            (default: LucianGn/IndexTTS2)
+#   HF_REV                   (default: main)
+#   WF_NAME                  (default: IndexTTS2.json)
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 COMFY="$WORKSPACE/ComfyUI"
 CUSTOM="$COMFY/custom_nodes"
 VENV="$COMFY/venv"
 WF_DIR="$COMFY/user/default/workflows"
-IN_DIR="$COMFY/input"
-VOICE_DIR="$CUSTOM/tts_audio_suite/voices_examples/indextts"
+IN_DIR_VOICES="$CUSTOM/tts_audio_suite/voices_examples/indextts"
+
+INSTALL_TTS_SUITE="${INSTALL_TTS_SUITE:-1}"
+INSTALL_INDEXTTS2_MODELS="${INSTALL_INDEXTTS2_MODELS:-0}"
+ASSETS_REFRESH="${ASSETS_REFRESH:-0}"
+FORCE_REDO="${FORCE_REDO:-0}"
 
 ASSET_DATASET="${ASSET_DATASET:-LucianGn/IndexTTS2}"
-ASSET_SUBDIR="${ASSET_SUBDIR:-IndexTTS2}"
 HF_REV="${HF_REV:-main}"
+WF_NAME="${WF_NAME:-IndexTTS2.json}"
+
+SENT_BOOTSTRAP="$WORKSPACE/.comfy_bootstrap_done"
+SENT_ASSETS="$COMFY/.assets_ok"
+SENT_TTS_SUITE="$CUSTOM/tts_audio_suite/.installed"
 
 export DEBIAN_FRONTEND=noninteractive
-mkdir -p "$WORKSPACE" "$WF_DIR" "$IN_DIR" "$VOICE_DIR"
+export PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# optional: reset one-time sentinel
-[ "${BOOTSTRAP_RESET:-0}" = "1" ] && rm -f "$WORKSPACE/.bootstrap_done"
+log() { echo -e ">>> $*"; }
 
-# lightweight fast-path dacă e deja instalat
-if [ -f "$WORKSPACE/.bootstrap_done" ] && [ -x "$COMFY/start.sh" ]; then
-  echo "[SKIP] bootstrap heavy — folosesc instalarea existentă"
-  exec "$COMFY/start.sh"
-fi
+mkdir -p "$WORKSPACE" "$WF_DIR" "$IN_DIR_VOICES"
 
-# --- HF token persist ---
+# -------- HF token cache (persist între boot-uri) --------
 if [ -z "${HF_TOKEN:-}" ] && [ -f "$WORKSPACE/HF_TOKEN" ]; then
   export HF_TOKEN="$(cat "$WORKSPACE/HF_TOKEN")"
 fi
 [ -n "${HF_TOKEN:-}" ] && printf "%s" "$HF_TOKEN" > "$WORKSPACE/HF_TOKEN" || true
 
-# --- OS deps ---
-if command -v apt-get >/dev/null 2>&1; then
-  apt-get update -y || true
-  apt-get install -y git git-lfs python3-venv python3-dev build-essential \
-                     ffmpeg aria2 curl ca-certificates libgl1 libglib2.0-0 || true
-fi
+# -------- First boot (sau FOCE_REDO) --------
+if [ ! -f "$SENT_BOOTSTRAP" ] || [ "$FORCE_REDO" = "1" ]; then
+  log "Bootstrap (first run or FORCE_REDO=1)"
 
-# --- ComfyUI (robust) ---
-# FIX: dacă folderul există dar nu e repo git, îl resetăm ca să nu pice `git clone`
-if [ -d "$COMFY" ] && [ ! -d "$COMFY/.git" ]; then
-  echo "[WARN] $COMFY există dar NU este repo git. Curăț..."
-  rm -rf "$COMFY"
-fi
-if [ ! -d "$COMFY/.git" ]; then
-  git clone --depth=1 https://github.com/comfyanonymous/ComfyUI "$COMFY"
-else
-  (cd "$COMFY" && git pull --ff-only || true)
-fi
+  # OS deps
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y || true
+    apt-get install -y git git-lfs python3-venv python3-dev build-essential \
+       ffmpeg aria2 curl ca-certificates libgl1 libglib2.0-0 || true
+  fi
 
-# --- Python venv ---
-if [ ! -d "$VENV" ]; then
-  python3 -m venv "$VENV"
-fi
-# shellcheck disable=SC1091
-source "$VENV/bin/activate"
-python -m pip install -U pip wheel setuptools --progress-bar off
+  # ComfyUI (repo curat)
+  if [ -d "$COMFY" ] && [ ! -d "$COMFY/.git" ]; then
+    log "ComfyUI folder exists dar nu e repo git; curat..."
+    rm -rf "$COMFY"
+  fi
+  if [ ! -d "$COMFY" ]; then
+    (cd "$WORKSPACE" && git clone https://github.com/comfyanonymous/ComfyUI)
+  else
+    (cd "$COMFY" && git pull --ff-only || true)
+  fi
 
-# Torch (GPU dacă e nvidia-smi)
-python - <<'PY' || \
-( command -v nvidia-smi >/dev/null 2>&1 && python -m pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio --progress-bar off ) || \
-python -m pip install torch torchvision torchaudio --progress-bar off
+  # Python venv
+  if [ ! -d "$VENV" ]; then
+    python3 -m venv "$VENV"
+  fi
+  # shellcheck disable=SC1091
+  source "$VENV/bin/activate"
+  python -m pip install -U pip wheel setuptools --progress-bar off
+
+  # Torch cu CUDA dacă e disponibil
+  python - <<'PY' || \
+  ( command -v nvidia-smi >/dev/null 2>&1 && python -m pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio --progress-bar off ) || \
+  python -m pip install torch torchvision torchaudio --progress-bar off
 import importlib,sys; sys.exit(0 if importlib.util.find_spec("torch") else 1)
 PY
 
-# Dependențe Comfy (best-effort)
-[ -f "$COMFY/requirements.txt" ] && pip install -r "$COMFY/requirements.txt" --progress-bar off || true
+  # ComfyUI deps (best effort)
+  [ -f "$COMFY/requirements.txt" ] && python -m pip install -r "$COMFY/requirements.txt" --progress-bar off || true
 
-# --- TTS-Audio-Suite node ---
-if [ ! -d "$CUSTOM/tts_audio_suite/.git" ]; then
-  git clone https://github.com/diodiogod/TTS-Audio-Suite "$CUSTOM/tts_audio_suite"
+  # Pin HF libs + accelerate (evită conflict <1.0 vs transformers)
+  pip install -U accelerate hf_transfer --progress-bar off
+  pip install "huggingface_hub>=0.34.0,<1.0" --progress-bar off
+
+  # Persist HF env în venv (cache HF separat de restul)
+  HF_ENV="$VENV/hf.env"
+  mkdir -p "$COMFY/models/.hf_cache"
+  cat > "$HF_ENV" <<EOF
+export HF_TOKEN="${HF_TOKEN:-}"
+export HF_ENDPOINT="https://huggingface.co"
+export HF_HOME="$COMFY/models/.hf_cache"
+export HF_HUB_ENABLE_HF_TRANSFER=1
+EOF
+  grep -q "hf.env" "$VENV/bin/activate" || echo 'test -f "${VIRTUAL_ENV}/hf.env" && . "${VIRTUAL_ENV}/hf.env"' >> "$VENV/bin/activate"
+
+  touch "$SENT_BOOTSTRAP"
 else
-  (cd "$CUSTOM/tts_audio_suite" && git pull --ff-only || true)
-fi
-if [ -f "$CUSTOM/tts_audio_suite/requirements.txt" ]; then
-  pip install -r "$CUSTOM/tts_audio_suite/requirements.txt" --progress-bar off || true
-else
-  pip install soundfile pydub librosa ffmpeg-python numpy --progress-bar off || true
+  # numai activează venv & env HF
+  # shellcheck disable=SC1091
+  source "$VENV/bin/activate" 2>/dev/null || true
+  test -f "$VENV/hf.env" && . "$VENV/hf.env" || true
+  # update ComfyUI ușor
+  if [ -d "$COMFY/.git" ]; then (cd "$COMFY" && git pull --ff-only || true); fi
 fi
 
-# --- (opțional) ComfyUI-Index-TTS node + accelerate (pentru emo/Qwen, etc.) ---
-if [ ! -d "$CUSTOM/ComfyUI-Index-TTS/.git" ]; then
-  git clone https://github.com/chenpipi0807/ComfyUI-Index-TTS "$CUSTOM/ComfyUI-Index-TTS"
-else
-  (cd "$CUSTOM/ComfyUI-Index-TTS" && git pull --ff-only || true)
+# -------- Node: TTS-Audio-Suite --------
+if [ "$INSTALL_TTS_SUITE" = "1" ]; then
+  if [ ! -d "$CUSTOM/tts_audio_suite/.git" ]; then
+    log "Instalez TTS-Audio-Suite..."
+    git clone https://github.com/diodiogod/TTS-Audio-Suite "$CUSTOM/tts_audio_suite"
+    if [ -f "$CUSTOM/tts_audio_suite/requirements.txt" ]; then
+      pip install -r "$CUSTOM/tts_audio_suite/requirements.txt" --progress-bar off || true
+    fi
+    touch "$SENT_TTS_SUITE"
+  else
+    log "Actualizez TTS-Audio-Suite..."
+    (cd "$CUSTOM/tts_audio_suite" && git pull --ff-only || true)
+    touch "$SENT_TTS_SUITE"
+  fi
 fi
-[ -f "$CUSTOM/ComfyUI-Index-TTS/requirements.txt" ] && pip install -r "$CUSTOM/ComfyUI-Index-TTS/requirements.txt" --progress-bar off || true
-pip install -U accelerate huggingface_hub hf_transfer --progress-bar off
 
-# HF login non-interactiv (OK pentru privat)
-python - <<'PY' || true
-import os
-from huggingface_hub import login
-tok=os.getenv("HF_TOKEN")
-print("HF login: token missing -> skip") if not tok else login(token=tok, add_to_git_credential=True)
+# -------- (OPȚIONAL) IndexTTS-2 models fără script .py --------
+# Implicit OPRIT (INSTALL_INDEXTTS2_MODELS=0). Activează dacă ai nevoie de node-ul IndexTTS-2 cu modele locale.
+if [ "$INSTALL_INDEXTTS2_MODELS" = "1" ]; then
+  MODEL_DIR="$COMFY/models/IndexTTS-2"
+  mkdir -p "$MODEL_DIR"
+  python - <<'PY' || true
+import os, pathlib
+from huggingface_hub import snapshot_download
+dst="/workspace/ComfyUI/models/IndexTTS-2"
+p=pathlib.Path(dst); p.mkdir(parents=True, exist_ok=True)
+# Tragem fișierele de bază (cele care îți lipseau în logu-urile trecute)
+need=["bpe.model","config.yaml","feat1.pt","feat2.pt","gpt.pth","s2mel.pth","wav2vec2bert_stats.pt","campplus_cn_common.bin"]
+missing=[f for f in need if not (p/f).exists()]
+if missing:
+    snapshot_download(repo_id="IndexTeam/IndexTTS-2", allow_patterns=need,
+                      local_dir=dst, local_dir_use_symlinks=False, resume_download=True)
+    print("[ok] IndexTTS-2: bazele descărcate.")
+else:
+    print("[skip] IndexTTS-2: bazele sunt deja prezente.")
+# Dacă dorești pachetele mari, extinde aici cu allow_patterns pentru subfolderele specifice.
 PY
+fi
 
-# --- Assets din HF dataset privat (workflow + voice pack în TTS-Audio-Suite) ---
-python - <<'PY'
+# -------- HF Assets: workflow + voices (idempotent) --------
+download_assets() {
+  python - <<'PY'
 import os, shutil, pathlib
 from huggingface_hub import hf_hub_download
 
-repo  = os.getenv("ASSET_DATASET", "LucianGn/IndexTTS2")
-rev   = os.getenv("HF_REV", "main")
-sub   = os.getenv("ASSET_SUBDIR", "IndexTTS2").strip("/")
-comfy = "/workspace/ComfyUI"
-voice_dir = f"{comfy}/custom_nodes/tts_audio_suite/voices_examples/indextts"
-wf_dir    = f"{comfy}/user/default/workflows"
+repo   = os.getenv("ASSET_DATASET","LucianGn/IndexTTS2")
+rev    = os.getenv("HF_REV","main")
+wfname = os.getenv("WF_NAME","IndexTTS2.json")
 
-pathlib.Path(voice_dir).mkdir(parents=True, exist_ok=True)
-pathlib.Path(wf_dir).mkdir(parents=True, exist_ok=True)
-
-# Numele EXACTE (cu spații) anunțate
-files = [
+targets = []
+# workflow
+targets.append( (wfname, "/workspace/ComfyUI/user/default/workflows") )
+# voci (numele anunțate de tine)
+voice_dir="/workspace/ComfyUI/custom_nodes/tts_audio_suite/voices_examples/indextts"
+voices = [
   "Morpheus _v2_us_accent.reference.txt",
   "Morpheus _v2_us_accent.txt",
   "Morpheus _v2_us_accent.wav",
@@ -135,37 +176,33 @@ files = [
   "Morpheus_v3_british_accent.txt",
   "Morpheus_v3_british_accent.wav",
 ]
-pairs = [(f, voice_dir) for f in files]
-pairs.append(("IndexTTS2.json", wf_dir))
+for v in voices:
+    targets.append( (v, voice_dir) )
 
-def fetch_one(name, dst_folder):
-    dst_folder = pathlib.Path(dst_folder)
-    dst_folder.mkdir(parents=True, exist_ok=True)
-    dest = dst_folder / name
-    if dest.exists():
-        print(f"[skip] {dest} deja există")
-        return
-    candidates = []
-    if sub:
-        candidates.append(f"{sub}/{name}")
-    candidates.append(name)
-    last_err=None
-    for cand in candidates:
-        try:
-            p = hf_hub_download(repo_id=repo, repo_type="dataset",
-                                filename=cand, revision=rev)
-            shutil.copy2(p, dest)
-            print(f"[ok] {name} -> {dest}")
-            return
-        except Exception as e:
-            last_err=e
-    print(f"[warn] nu am putut descărca {name}: {last_err}")
-
-for name, folder in pairs:
-    fetch_one(name, folder)
+for name, folder in targets:
+    d = pathlib.Path(folder); d.mkdir(parents=True, exist_ok=True)
+    dest = d / name
+    if dest.exists() and os.getenv("ASSETS_REFRESH","0") != "1":
+        print(f"[skip] {dest} already exists")
+        continue
+    try:
+        p = hf_hub_download(repo_id=repo, repo_type="dataset", filename=name, revision=rev)
+        shutil.copy2(p, dest)
+        print(f"[ok] saved {dest}")
+    except Exception as e:
+        print(f"[warn] failed to fetch {name} from {repo}@{rev}: {e}")
 PY
+}
 
-# --- Launcher ---
+if [ "$ASSETS_REFRESH" = "1" ] || [ ! -f "$SENT_ASSETS" ]; then
+  log "Descarc workflow + voices din HF..."
+  download_assets
+  touch "$SENT_ASSETS"
+else
+  log "Assets HF deja prezente (setează ASSETS_REFRESH=1 ca să refaci)."
+fi
+
+# -------- Launcher ComfyUI --------
 if [ ! -f "$COMFY/start.sh" ]; then
   cat > "$COMFY/start.sh" <<'SH'
 #!/usr/bin/env bash
@@ -176,11 +213,5 @@ SH
   chmod +x "$COMFY/start.sh"
 fi
 
-# Sanity check (previne „main.py missing”)
-test -f "$COMFY/main.py" || { echo "FATAL: /workspace/ComfyUI/main.py lipsește (clone eșuat)."; exit 1; }
-
-# Marchează că bootstrap-ul complet a fost rulat cu succes
-touch "$WORKSPACE/.bootstrap_done"
-
-echo "[run] ComfyUI on 0.0.0.0:8188"
+log "[run] ComfyUI on 0.0.0.0:8188"
 exec "$COMFY/start.sh"
