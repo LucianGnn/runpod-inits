@@ -2,14 +2,15 @@
 set -euo pipefail
 
 # RunPod bootstrap — ComfyUI + TTS-Audio-Suite + (optional) IndexTTS-2
-# Env you can set in the template:
+# Env (set in Template):
 #   HF_TOKEN              (secret; necesar pt. dataset privat)
 #   WORKSPACE=/workspace  (implicit)
 #   ASSET_DATASET=LucianGn/IndexTTS2
-#   ASSET_SUBDIR=IndexTTS2          # dacă fișierele sunt într-un subfolder din dataset
+#   ASSET_SUBDIR=IndexTTS2          # dacă fișierele sunt într-un subfolder
 #   HF_REV=main
 #   AUTO_UPDATE=true
-#   TTS2_PROMPT_CHOICE=1            # ignorat acum (nu mai folosim TTS2_download.py)
+#   BOOTSTRAP_RESET=0|1             # 1 = forțează rebuild
+#   # (IndexTTS-2 rămâne opțional; nu mai folosim TTS2_download.py)
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 COMFY="$WORKSPACE/ComfyUI"
@@ -26,10 +27,10 @@ HF_REV="${HF_REV:-main}"
 export DEBIAN_FRONTEND=noninteractive
 mkdir -p "$WORKSPACE" "$WF_DIR" "$IN_DIR" "$VOICE_DIR"
 
-# Optional: reset for a clean rebuild
+# optional: reset one-time sentinel
 [ "${BOOTSTRAP_RESET:-0}" = "1" ] && rm -f "$WORKSPACE/.bootstrap_done"
 
-# Skip heavy bootstrap if already done
+# lightweight fast-path dacă e deja instalat
 if [ -f "$WORKSPACE/.bootstrap_done" ] && [ -x "$COMFY/start.sh" ]; then
   echo "[SKIP] bootstrap heavy — folosesc instalarea existentă"
   exec "$COMFY/start.sh"
@@ -48,9 +49,14 @@ if command -v apt-get >/dev/null 2>&1; then
                      ffmpeg aria2 curl ca-certificates libgl1 libglib2.0-0 || true
 fi
 
-# --- ComfyUI ---
+# --- ComfyUI (robust) ---
+# FIX: dacă folderul există dar nu e repo git, îl resetăm ca să nu pice `git clone`
+if [ -d "$COMFY" ] && [ ! -d "$COMFY/.git" ]; then
+  echo "[WARN] $COMFY există dar NU este repo git. Curăț..."
+  rm -rf "$COMFY"
+fi
 if [ ! -d "$COMFY/.git" ]; then
-  (cd "$WORKSPACE" && git clone https://github.com/comfyanonymous/ComfyUI)
+  git clone --depth=1 https://github.com/comfyanonymous/ComfyUI "$COMFY"
 else
   (cd "$COMFY" && git pull --ff-only || true)
 fi
@@ -79,14 +85,13 @@ if [ ! -d "$CUSTOM/tts_audio_suite/.git" ]; then
 else
   (cd "$CUSTOM/tts_audio_suite" && git pull --ff-only || true)
 fi
-# Instalează requirements dacă există, altfel pune minime utile
 if [ -f "$CUSTOM/tts_audio_suite/requirements.txt" ]; then
   pip install -r "$CUSTOM/tts_audio_suite/requirements.txt" --progress-bar off || true
 else
   pip install soundfile pydub librosa ffmpeg-python numpy --progress-bar off || true
 fi
 
-# --- (opțional) ComfyUI-Index-TTS node + accelerate ---
+# --- (opțional) ComfyUI-Index-TTS node + accelerate (pentru emo/Qwen, etc.) ---
 if [ ! -d "$CUSTOM/ComfyUI-Index-TTS/.git" ]; then
   git clone https://github.com/chenpipi0807/ComfyUI-Index-TTS "$CUSTOM/ComfyUI-Index-TTS"
 else
@@ -95,7 +100,7 @@ fi
 [ -f "$CUSTOM/ComfyUI-Index-TTS/requirements.txt" ] && pip install -r "$CUSTOM/ComfyUI-Index-TTS/requirements.txt" --progress-bar off || true
 pip install -U accelerate huggingface_hub hf_transfer --progress-bar off
 
-# HF login non-interactiv (ok și pt. privat)
+# HF login non-interactiv (OK pentru privat)
 python - <<'PY' || true
 import os
 from huggingface_hub import login
@@ -103,7 +108,7 @@ tok=os.getenv("HF_TOKEN")
 print("HF login: token missing -> skip") if not tok else login(token=tok, add_to_git_credential=True)
 PY
 
-# --- Assets din HF dataset privat ---
+# --- Assets din HF dataset privat (workflow + voice pack în TTS-Audio-Suite) ---
 python - <<'PY'
 import os, shutil, pathlib
 from huggingface_hub import hf_hub_download
@@ -118,7 +123,7 @@ wf_dir    = f"{comfy}/user/default/workflows"
 pathlib.Path(voice_dir).mkdir(parents=True, exist_ok=True)
 pathlib.Path(wf_dir).mkdir(parents=True, exist_ok=True)
 
-# Numele EXACTE (cu spații) pe care le-ai listat
+# Numele EXACTE (cu spații) anunțate
 files = [
   "Morpheus _v2_us_accent.reference.txt",
   "Morpheus _v2_us_accent.txt",
@@ -130,7 +135,6 @@ files = [
   "Morpheus_v3_british_accent.txt",
   "Morpheus_v3_british_accent.wav",
 ]
-# destinații
 pairs = [(f, voice_dir) for f in files]
 pairs.append(("IndexTTS2.json", wf_dir))
 
@@ -172,13 +176,11 @@ SH
   chmod +x "$COMFY/start.sh"
 fi
 
-# Sanity check
-test -f "$COMFY/main.py" || { echo "FATAL: /workspace/ComfyUI/main.py lipsește"; exit 1; }
+# Sanity check (previne „main.py missing”)
+test -f "$COMFY/main.py" || { echo "FATAL: /workspace/ComfyUI/main.py lipsește (clone eșuat)."; exit 1; }
+
 # Marchează că bootstrap-ul complet a fost rulat cu succes
 touch "$WORKSPACE/.bootstrap_done"
-
-echo "[run] ComfyUI on 0.0.0.0:8188"
-exec "$COMFY/start.sh"
 
 echo "[run] ComfyUI on 0.0.0.0:8188"
 exec "$COMFY/start.sh"
