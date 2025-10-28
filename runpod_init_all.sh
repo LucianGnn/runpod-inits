@@ -166,6 +166,7 @@ exec python -u /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188
 SH
   chmod +x "$COMFY/start.sh"
 fi
+export PYTHONPATH="...:${PYTHONPATH:-}"
 
 echo "[run] ComfyUI on 0.0.0.0:8188"
 exec "$COMFY/start.sh"
