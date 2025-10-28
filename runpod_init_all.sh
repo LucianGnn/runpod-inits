@@ -3,18 +3,15 @@ set -euo pipefail
 trap 'echo "[!] bootstrap failed at line $LINENO"; exit 1' ERR
 
 # RunPod bootstrap — ComfyUI + Manager + TTS-Audio-Suite + IndexTTS (models+assets)
-# Executed as: bash -lc 'curl -fsSL https://raw.githubusercontent.com/<you>/runpod-inits/main/runpod_init_all.sh | bash'
-#
 # Env:
-#   HF_TOKEN         (optional; saved in $WORKSPACE/HF_TOKEN; required if HF dataset is private)
-#   WORKSPACE        (default: /workspace)
-#   ASSET_DATASET    (default: LucianGn/IndexTTS2)
-#   HF_REV           (default: main)
-#   WF_NAME          (default: IndexTTS2.json)
-#   VOICE_DIR_NAME   (default: indextts)
-#   FORCE_BOOTSTRAP  (default: 0) set 1 to redo heavy install
-#
-# ComfyUI listens on 0.0.0.0:8188
+#   HF_TOKEN            (opțional; salvat în $WORKSPACE/HF_TOKEN; necesar dacă datasetul e privat)
+#   WORKSPACE           (default: /workspace)
+#   ASSET_DATASET       (default: LucianGn/IndexTTS2)
+#   HF_REV              (default: main)
+#   WF_NAME             (default: IndexTTS2.json)
+#   VOICE_DIR_NAME      (default: indextts)
+#   FORCE_BOOTSTRAP     (default: 0)  set 1 ca să refaci instalarea grea
+# Rulează ComfyUI pe 0.0.0.0:8188
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 COMFY="$WORKSPACE/ComfyUI"
@@ -37,15 +34,15 @@ WF_DST="$COMFY/user/default/workflows"
 INPUT_DIR="$COMFY/input"
 
 export DEBIAN_FRONTEND=noninteractive
-mkdir -p "$WORKSPACE" "$CUSTOM" "$WF_DST" "$VOICES_DST" "$INPUT_DIR" "$CACHE_DIR"
+mkdir -p "$WORKSPACE" "$WF_DST" "$VOICES_DST" "$INPUT_DIR" "$CACHE_DIR"
 
-# --- HF token reuse ---
+# HF token reuse
 if [ -z "${HF_TOKEN:-}" ] && [ -f "$WORKSPACE/HF_TOKEN" ]; then
   export HF_TOKEN="$(cat "$WORKSPACE/HF_TOKEN")"
 fi
 [ -n "${HF_TOKEN:-}" ] && printf "%s" "$HF_TOKEN" > "$WORKSPACE/HF_TOKEN" || true
 
-# --- helpers ---
+# --- Funcții utilitare ---
 ensure_repo () {
   local path="$1" url="$2"
   if [ ! -d "$path/.git" ]; then
@@ -55,39 +52,40 @@ ensure_repo () {
     (cd "$path" && git reset --hard && git pull --ff-only || true)
   fi
 }
+
 pip_quiet () { python -m pip install -U "$@" --progress-bar off; }
 
-# --- OS deps ---
+# OS deps
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -y || true
   apt-get install -y git git-lfs python3-venv python3-dev build-essential ffmpeg aria2 curl ca-certificates libgl1 libglib2.0-0 || true
 fi
 
-# ========== HEAVY BOOTSTRAP (once) ==========
+# --- Bootstrap greu (o singură dată sau la FORCE_BOOTSTRAP=1) ---
 if [ "${FORCE_BOOTSTRAP:-0}" = "1" ] || [ ! -f "$BOOT_SENTINEL" ]; then
-  echo "[init] heavy bootstrap…"
+  echo "[bootstrap] Heavy install…"
 
-  # 1) ComfyUI
+  # ComfyUI
   ensure_repo "$COMFY" https://github.com/comfyanonymous/ComfyUI
   [ -f "$COMFY/main.py" ] || { echo "[!] ComfyUI main.py missing"; exit 1; }
 
-  # 2) venv + pip stack
+  # Python venv
   [ -d "$VENV" ] || python3 -m venv "$VENV"
   # shellcheck disable=SC1091
   source "$VENV/bin/activate"
   pip_quiet pip wheel setuptools
 
-  # 3) Torch (GPU if available)
+  # Torch (GPU dacă există)
   python - <<'PY' || \
   ( command -v nvidia-smi >/dev/null 2>&1 && python -m pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio --progress-bar off ) || \
   python -m pip install torch torchvision torchaudio --progress-bar off
 import importlib,sys; sys.exit(0 if importlib.util.find_spec("torch") else 1)
 PY
 
-  # 4) Comfy requirements (best effort)
+  # Comfy reqs (best effort)
   [ -f "$COMFY/requirements.txt" ] && python -m pip install -r "$COMFY/requirements.txt" --progress-bar off || true
 
-  # 5) Custom nodes
+  # Custom nodes
   ensure_repo "$MANAGER_DIR"  https://github.com/ltdrdata/ComfyUI-Manager
   [ -f "$MANAGER_DIR/requirements.txt" ] && pip_quiet -r "$MANAGER_DIR/requirements.txt" || true
 
@@ -97,19 +95,20 @@ PY
   ensure_repo "$TTS_SUITE_DIR" https://github.com/diodiogod/TTS-Audio-Suite
   [ -f "$TTS_SUITE_DIR/requirements.txt" ] && pip_quiet -r "$TTS_SUITE_DIR/requirements.txt" || true
 
-  # 6) Extra deps for IndexTTS / transformers / modelscope
+  # Dependențe suplimentare pentru IndexTTS & ModelScope/Transformers
+  # (accelerate e cerut când apare device_map, etc.)
   pip_quiet accelerate modelscope huggingface_hub hf_transfer
-  # --- PINS pentru compatibilitate ComfyUI ---
-  pip_quiet --no-deps 'transformers==4.43.3' 'tokenizers==0.15.2' 'huggingface_hub==0.24.6'
-  pip_quiet safetensors sentencepiece
 
-  # 7) Symlink the full 'indextts' package (TTS-Audio-Suite imports it)
+  # --- Pin critic: asigură huggingface-hub < 1.0 (transformers cere asta) ---
+  python -m pip install --upgrade 'huggingface_hub<1.0' --progress-bar off
+
+  # Symlink către pachetul complet 'indextts' (folosit de TTS-Audio-Suite)
   VENDOR_IDX="$IDX_NODE_DIR/indextts2/vendor/indextts"
   if [ -d "$VENDOR_IDX" ] && [ ! -e "$TTS_SUITE_DIR/indextts" ]; then
     ln -s "$VENDOR_IDX" "$TTS_SUITE_DIR/indextts"
   fi
 
-  # 8) hf.env (FIX: PYTHONPATH uses fallback ${PYTHONPATH:-})
+  # Persist HF + PYTHONPATH robust (folosind fallback ${PYTHONPATH:-})
   HF_ENV="$VENV/hf.env"
   cat > "$HF_ENV" <<EOF
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -117,12 +116,12 @@ export HF_ENDPOINT="https://huggingface.co"
 export HF_HOME="$CACHE_DIR"
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export DS_BUILD_OPS=0
-# Make IndexTTS importable for TTS-Audio-Suite (robust even if PYTHONPATH unset)
+# Import IndexTTS for TTS-Audio-Suite (robust cu nounset)
 export PYTHONPATH="$TTS_SUITE_DIR:$TTS_SUITE_DIR/engines/index_tts:$IDX_NODE_DIR/indextts2/vendor:\${PYTHONPATH:-}"
 EOF
   grep -q "hf.env" "$VENV/bin/activate" || echo 'test -f "${VIRTUAL_ENV}/hf.env" && . "${VIRTUAL_ENV}/hf.env"' >> "$VENV/bin/activate"
 
-  # 9) HF assets: workflow + voices
+  # Assets din HF: workflow + voci Morpheus
   python - <<'PY' || true
 import os, pathlib, shutil
 from huggingface_hub import hf_hub_download
@@ -141,7 +140,6 @@ try:
 except Exception as e:
     print("[warn] workflow download failed:", e)
 
-# All voice files
 names = [
     "Morpheus.wav","Morpheus.txt","Morpheus.reference.txt",
     "Morpheus_v3_british_accent.wav","Morpheus_v3_british_accent.txt","Morpheus_v3_british_accent.reference.txt",
@@ -158,24 +156,19 @@ PY
 
   date > "$BOOT_SENTINEL"
 else
-  echo "[init] fast path (cached)…"
+  echo "[bootstrap] Fast path (cached)."
   # shellcheck disable=SC1091
   source "$VENV/bin/activate"
-  # In case an old hf.env lacked the fallback, patch it once
-  if [ -f "$VENV/hf.env" ]; then
-    sed -i 's/:$PYTHONPATH/:${PYTHONPATH:-}/' "$VENV/hf.env" || true
-  fi
-  # If ComfyUI got corrupted somehow, repair
-  [ -f "$COMFY/main.py" ] || ensure_repo "$COMFY" https://github.com/comfyanonymous/ComfyUI
+  # Siguranță la repornire: menține hub sub 1.0
+  python -m pip install --upgrade 'huggingface_hub<1.0' --progress-bar off || true
 fi
 
-# --- launcher ---
+# Launcher + start
 if [ ! -f "$COMFY/start.sh" ]; then
   cat > "$COMFY/start.sh" <<'SH'
 #!/usr/bin/env bash
 set -e -o pipefail
 source /workspace/ComfyUI/venv/bin/activate
-# hf.env is sourced by activate; PYTHONPATH has safe fallback ${PYTHONPATH:-}
 exec python -u /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188
 SH
   chmod +x "$COMFY/start.sh"
