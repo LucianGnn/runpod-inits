@@ -99,6 +99,9 @@ PY
 
   # 6) Extra deps for IndexTTS / transformers / modelscope
   pip_quiet accelerate modelscope huggingface_hub hf_transfer
+  # --- PINS pentru compatibilitate ComfyUI ---
+  pip_quiet --no-deps 'transformers==4.43.3' 'tokenizers==0.15.2' 'huggingface_hub==0.24.6'
+  pip_quiet safetensors sentencepiece
 
   # 7) Symlink the full 'indextts' package (TTS-Audio-Suite imports it)
   VENDOR_IDX="$IDX_NODE_DIR/indextts2/vendor/indextts"
