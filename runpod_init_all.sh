@@ -26,6 +26,15 @@ HF_REV="${HF_REV:-main}"
 export DEBIAN_FRONTEND=noninteractive
 mkdir -p "$WORKSPACE" "$WF_DIR" "$IN_DIR" "$VOICE_DIR"
 
+# Optional: reset for a clean rebuild
+[ "${BOOTSTRAP_RESET:-0}" = "1" ] && rm -f "$WORKSPACE/.bootstrap_done"
+
+# Skip heavy bootstrap if already done
+if [ -f "$WORKSPACE/.bootstrap_done" ] && [ -x "$COMFY/start.sh" ]; then
+  echo "[SKIP] bootstrap heavy — folosesc instalarea existentă"
+  exec "$COMFY/start.sh"
+fi
+
 # --- HF token persist ---
 if [ -z "${HF_TOKEN:-}" ] && [ -f "$WORKSPACE/HF_TOKEN" ]; then
   export HF_TOKEN="$(cat "$WORKSPACE/HF_TOKEN")"
@@ -165,6 +174,11 @@ fi
 
 # Sanity check
 test -f "$COMFY/main.py" || { echo "FATAL: /workspace/ComfyUI/main.py lipsește"; exit 1; }
+# Marchează că bootstrap-ul complet a fost rulat cu succes
+touch "$WORKSPACE/.bootstrap_done"
+
+echo "[run] ComfyUI on 0.0.0.0:8188"
+exec "$COMFY/start.sh"
 
 echo "[run] ComfyUI on 0.0.0.0:8188"
 exec "$COMFY/start.sh"
