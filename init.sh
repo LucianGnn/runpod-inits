@@ -81,16 +81,10 @@ if [ "$SKIP_JUPYTER" != "1" ]; then
   pip install --no-cache-dir jupyterlab
 
   log "Starting JupyterLab on 0.0.0.0:${JUPYTER_PORT} (token: ${JUPYTER_TOKEN})"
-  exec jupyter lab \
-    --ServerApp.ip=0.0.0.0 \
-    --ServerApp.port="$JUPYTER_PORT" \
-    --ServerApp.allow_remote_access=True \
-    --ServerApp.token="$JUPYTER_TOKEN" \
-    --ServerApp.root_dir="$JUPYTER_ROOT" \
-    --ServerApp.allow_origin="*" \
-    --ServerApp.disable_check_xsrf=True \
-    --ServerApp.allow_root=True \
-    --no-browser
+  exec jupyter lab --ServerApp.ip=0.0.0.0 --ServerApp.port="$JUPYTER_PORT" \
+  --ServerApp.allow_remote_access=True --ServerApp.root_dir="$JUPYTER_ROOT" \
+  --ServerApp.allow_origin="*" --ServerApp.disable_check_xsrf=True \
+  --ServerApp.allow_root=True --IdentityProvider.token=""
 else
   log "ComfyUI running. Tail logs with: tail -f $WORKSPACE/comfyui.log"
   # Ține containerul în viață când Jupyter e dezactivat
