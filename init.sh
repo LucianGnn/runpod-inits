@@ -73,7 +73,9 @@ fi
 cd "$COMFY_DIR"
 ( command -v fuser >/dev/null 2>&1 && fuser -k "${COMFY_PORT}/tcp" ) || true
 log "Starting ComfyUI on ${HOST}:${COMFY_PORT}"
+export PYTHONUNBUFFERED=1
 nohup python main.py --listen "$HOST" --port "$COMFY_PORT" > "$WORKSPACE/comfyui.log" 2>&1 &
+log "Comfy log at: $WORKSPACE/comfyui.log"
 
 # ================== JupyterLab (optional, foreground) ==================
 if [ "$SKIP_JUPYTER" != "1" ]; then
