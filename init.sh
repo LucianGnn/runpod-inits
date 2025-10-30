@@ -20,7 +20,7 @@ log "Installing base packages..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   git ca-certificates curl python3 python3-venv python3-dev build-essential \
-  procps net-tools lsof
+  procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data
 
 mkdir -p "$WORKSPACE"
 
@@ -47,11 +47,10 @@ source "$COMFY_DIR/venv/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
 [ -f "$COMFY_DIR/requirements.txt" ] && pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt"
 
-# ================== ComfyUI-Manager only ==================
+# ================== ComfyUI-Manager ==================
 CUSTOM_NODES="$COMFY_DIR/custom_nodes"
 MANAGER_DIR="$CUSTOM_NODES/ComfyUI-Manager"
 mkdir -p "$CUSTOM_NODES"
-
 if [ ! -d "$MANAGER_DIR/.git" ]; then
   log "Cloning ComfyUI-Manager"
   git clone https://github.com/ltdrdata/ComfyUI-Manager "$MANAGER_DIR" || true
@@ -68,40 +67,47 @@ if [ -d "$MANAGER_DIR/.git" ]; then
 else
   log "WARNING: ComfyUI-Manager clone failed; continui fără Manager."
 fi
-# ================== Python venv & deps ==================
-if [ ! -d "$COMFY_DIR/venv" ]; then
-  log "Creating Python venv"
-  python3 -m venv "$COMFY_DIR/venv"
-fi
-# shellcheck source=/dev/null
-source "$COMFY_DIR/venv/bin/activate"
-python -m pip install --upgrade pip setuptools wheel
 
-# (deps ComfyUI de bază)
-[ -f "$COMFY_DIR/requirements.txt" ] && pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt"
-
-# === AUDIO DEPS pentru TTS Audio Suite (fără TorchCodec) ===
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  ffmpeg portaudio19-dev espeak espeak-data
-
+# ================== AUDIO deps pentru TTS Audio Suite (fără TorchCodec) ==================
 pip install --no-cache-dir \
   soundfile==0.13.1 librosa==0.11.0 numba==0.62.1 \
   cached-path==1.8.0 onnxruntime-gpu==1.20.1 audio-separator==0.39.1
 
-# Dezactivează TorchCodec în torchaudio
+# Dezactivează definitiv TorchCodec pentru torchaudio
 export TORCHAUDIO_USE_TORCHCODEC=0
 grep -q 'TORCHAUDIO_USE_TORCHCODEC' "$COMFY_DIR/venv/bin/activate" || \
   echo 'export TORCHAUDIO_USE_TORCHCODEC=0' >> "$COMFY_DIR/venv/bin/activate"
 
-# Convertor automat: voice-ref MP3/M4A/AAC -> WAV (ca să nu mai ceară TorchCodec)
-VOICES_ROOT="$COMFY_DIR/custom_nodes/TTS-Audio-Suite/voices_examples"
+# ================== Instalează deps pentru toate custom nodes (dacă au requirements.txt) ==================
+if [ -d "$CUSTOM_NODES" ]; then
+  while IFS= read -r -d '' req; do
+    log "Installing custom node deps: $(dirname "$req")/requirements.txt"
+    pip install --no-cache-dir -r "$req" || true
+  done < <(find "$CUSTOM_NODES" -maxdepth 2 -type f -name 'requirements.txt' -print0)
+fi
+
+# ================== Convertor automat voice refs -> WAV ==================
+VOICES_ROOT="$CUSTOM_NODES/TTS-Audio-Suite/voices_examples"
 if [ -d "$VOICES_ROOT" ]; then
   while IFS= read -r -d '' f; do
     wav="${f%.*}.wav"
     [ -f "$wav" ] || ffmpeg -y -hide_banner -loglevel error -i "$f" -ar 44100 -ac 1 "$wav"
   done < <(find "$VOICES_ROOT" -type f \( -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.aac' \) -print0)
 fi
+
+# ================== Self-test audio ==================
+python - <<'PY'
+import os, torchaudio, soundfile, tempfile, numpy as np
+print("Audio Self-Test: TORCHAUDIO_USE_TORCHCODEC =", os.getenv("TORCHAUDIO_USE_TORCHCODEC"))
+# gen un ton scurt, salveaza WAV, reîncarcă prin torchaudio
+sr=44100
+x=(0.1*np.sin(2*np.pi*440*np.arange(int(0.1*sr))/sr)).astype('float32')
+tmp= tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+soundfile.write(tmp, x, sr)
+wav, rate = torchaudio.load(tmp)
+assert rate==sr and wav.numel()>0
+print("Audio IO OK ✅ using backend without TorchCodec")
+PY
 
 # ================== Launch ComfyUI (background) ==================
 cd "$COMFY_DIR"
@@ -112,19 +118,16 @@ export TORCHAUDIO_USE_TORCHCODEC=0
 nohup python main.py --listen "$HOST" --port "$COMFY_PORT" > "$WORKSPACE/comfyui.log" 2>&1 &
 log "Comfy log at: $WORKSPACE/comfyui.log"
 
-
 # ================== JupyterLab (optional, foreground) ==================
 if [ "$SKIP_JUPYTER" != "1" ]; then
   log "Installing JupyterLab"
   pip install --no-cache-dir jupyterlab
-
   log "Starting JupyterLab on 0.0.0.0:${JUPYTER_PORT} (token: ${JUPYTER_TOKEN})"
   exec jupyter lab --ServerApp.ip=0.0.0.0 --ServerApp.port="$JUPYTER_PORT" \
-  --ServerApp.allow_remote_access=True --ServerApp.root_dir="$JUPYTER_ROOT" \
-  --ServerApp.allow_origin="*" --ServerApp.disable_check_xsrf=True \
-  --ServerApp.allow_root=True --IdentityProvider.token=""
+    --ServerApp.allow_remote_access=True --ServerApp.root_dir="$JUPYTER_ROOT" \
+    --ServerApp.allow_origin="*" --ServerApp.disable_check_xsrf=True \
+    --ServerApp.allow_root=True --IdentityProvider.token=""
 else
   log "ComfyUI running. Tail logs with: tail -f $WORKSPACE/comfyui.log"
-  # Ține containerul în viață când Jupyter e dezactivat
   exec bash -lc "while sleep 3600; do :; done"
 fi
