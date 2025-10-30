@@ -45,6 +45,36 @@ fi
 # shellcheck source=/dev/null
 source "$COMFY_DIR/venv/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
+# --- PIN PyTorch 2.4 + CUDA 12.4 și dezinstalează ce e greșit ---
+export PIP_INDEX_URL="https://download.pytorch.org/whl/cu124"
+
+# Constrângeri „globale” pentru orice pip ulterior (inclusiv Manager/custom nodes)
+CONSTR="$WORKSPACE/pip-constraints.txt"
+cat > "$CONSTR" <<'TXT'
+torch==2.4.0+cu124
+torchaudio==2.4.0+cu124
+torchvision==0.19.0+cu124
+TXT
+export PIP_CONSTRAINT="$CONSTR"
+
+# Taie versiunile greșite (în special 2.9.x) și TorchCodec dacă a apucat să intre
+pip uninstall -y torch torchaudio torchvision torchcodec || true
+
+# Reinstalează forțat stack-ul corect
+pip install --no-cache-dir --force-reinstall \
+  torch==2.4.0+cu124 torchaudio==2.4.0+cu124 torchvision==0.19.0+cu124
+
+# Persistă setările în activarea venv (pentru orice sesiune/upgrade ulterior)
+grep -q 'PIP_INDEX_URL=' "$COMFY_DIR/venv/bin/activate" || \
+  echo 'export PIP_INDEX_URL=https://download.pytorch.org/whl/cu124' >> "$COMFY_DIR/venv/bin/activate"
+grep -q 'PIP_CONSTRAINT=' "$COMFY_DIR/venv/bin/activate" || \
+  echo 'export PIP_CONSTRAINT=/workspace/pip-constraints.txt' >> "$COMFY_DIR/venv/bin/activate"
+
+# Dezactivează definitiv TorchCodec pentru torchaudio (fallback pe SoundFile/FFmpeg)
+export TORCHAUDIO_USE_TORCHCODEC=0
+grep -q 'TORCHAUDIO_USE_TORCHCODEC' "$COMFY_DIR/venv/bin/activate" || \
+  echo 'export TORCHAUDIO_USE_TORCHCODEC=0' >> "$COMFY_DIR/venv/bin/activate"
+
 [ -f "$COMFY_DIR/requirements.txt" ] && pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt"
 
 # ================== ComfyUI-Manager ==================
