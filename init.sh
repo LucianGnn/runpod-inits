@@ -68,14 +68,50 @@ if [ -d "$MANAGER_DIR/.git" ]; then
 else
   log "WARNING: ComfyUI-Manager clone failed; continui fără Manager."
 fi
+# ================== Python venv & deps ==================
+if [ ! -d "$COMFY_DIR/venv" ]; then
+  log "Creating Python venv"
+  python3 -m venv "$COMFY_DIR/venv"
+fi
+# shellcheck source=/dev/null
+source "$COMFY_DIR/venv/bin/activate"
+python -m pip install --upgrade pip setuptools wheel
+
+# (deps ComfyUI de bază)
+[ -f "$COMFY_DIR/requirements.txt" ] && pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt"
+
+# === AUDIO DEPS pentru TTS Audio Suite (fără TorchCodec) ===
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  ffmpeg portaudio19-dev espeak espeak-data
+
+pip install --no-cache-dir \
+  soundfile==0.13.1 librosa==0.11.0 numba==0.62.1 \
+  cached-path==1.8.0 onnxruntime-gpu==1.20.1 audio-separator==0.39.1
+
+# Dezactivează TorchCodec în torchaudio
+export TORCHAUDIO_USE_TORCHCODEC=0
+grep -q 'TORCHAUDIO_USE_TORCHCODEC' "$COMFY_DIR/venv/bin/activate" || \
+  echo 'export TORCHAUDIO_USE_TORCHCODEC=0' >> "$COMFY_DIR/venv/bin/activate"
+
+# Convertor automat: voice-ref MP3/M4A/AAC -> WAV (ca să nu mai ceară TorchCodec)
+VOICES_ROOT="$COMFY_DIR/custom_nodes/TTS-Audio-Suite/voices_examples"
+if [ -d "$VOICES_ROOT" ]; then
+  while IFS= read -r -d '' f; do
+    wav="${f%.*}.wav"
+    [ -f "$wav" ] || ffmpeg -y -hide_banner -loglevel error -i "$f" -ar 44100 -ac 1 "$wav"
+  done < <(find "$VOICES_ROOT" -type f \( -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.aac' \) -print0)
+fi
 
 # ================== Launch ComfyUI (background) ==================
 cd "$COMFY_DIR"
 ( command -v fuser >/dev/null 2>&1 && fuser -k "${COMFY_PORT}/tcp" ) || true
 log "Starting ComfyUI on ${HOST}:${COMFY_PORT}"
 export PYTHONUNBUFFERED=1
+export TORCHAUDIO_USE_TORCHCODEC=0
 nohup python main.py --listen "$HOST" --port "$COMFY_PORT" > "$WORKSPACE/comfyui.log" 2>&1 &
 log "Comfy log at: $WORKSPACE/comfyui.log"
+
 
 # ================== JupyterLab (optional, foreground) ==================
 if [ "$SKIP_JUPYTER" != "1" ]; then
