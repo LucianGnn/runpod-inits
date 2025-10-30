@@ -53,12 +53,12 @@ if [ ! -d "$MANAGER_DIR/.git" ]; then
   git clone https://github.com/ltdrdata/ComfyUI-Manager "$MANAGER_DIR"
 else
   echo "[GIT] Updating ComfyUI-Manager"
-  git -C "$MANAGER_DIR" fetch --all
-  git -C "$MANAGER_DIR" reset --hard origin/master
-fi
-if [ -f "$MANAGER_DIR/requirements.txt" ]; then
-  echo "[PIP] Installing Manager requirements"
-  pip install --no-cache-dir -r "$MANAGER_DIR/requirements.txt" || true
+  git -C "$MANAGER_DIR" fetch --all || true
+  # detectează HEAD-ul implicit al remote-ului (main/master)
+  HEADREF="$(git -C "$MANAGER_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  BRANCH="${HEADREF#origin/}"; [ -z "$BRANCH" ] && BRANCH="main"
+  git -C "$MANAGER_DIR" checkout -B "$BRANCH" "origin/$BRANCH" || true
+  git -C "$MANAGER_DIR" reset --hard "origin/$BRANCH" || true
 fi
 
 # ================== Launch ComfyUI (background) ==================
