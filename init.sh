@@ -181,6 +181,11 @@ else
   log "Starting ComfyUI on ${HOST}:${COMFY_PORT}"
   export PYTHONUNBUFFERED=1
   export TORCHAUDIO_USE_TORCHCODEC=0
+
+  export TRANSFORMERS_USE_SAFETENSORS=1
+  export SAFETENSORS_FAST_GPU=1
+  export HF_HUB_ENABLE_HF_TRANSFER=0
+  
   nohup python main.py --listen "$HOST" --port "$COMFY_PORT" > "$COMFY_LOG" 2>&1 &
   log "Comfy log at: $COMFY_LOG"
 fi
