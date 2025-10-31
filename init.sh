@@ -44,7 +44,7 @@ else
   git -C "$COMFY_DIR" reset --hard "origin/$CU_BRANCH" || true
 fi
 
-# ================== Python venv & pin PyTorch stack ==================
+# ================== Python venv ==================
 if [ ! -d "$COMFY_DIR/venv" ]; then
   log "Creating Python venv"
   python3 -m venv "$COMFY_DIR/venv"
@@ -53,31 +53,21 @@ fi
 source "$COMFY_DIR/venv/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
 
-# Pinăm global stack-ul corect (PyTorch/Torchaudio 2.4 cu CUDA 12.4)
-export PIP_INDEX_URL="https://download.pytorch.org/whl/cu124"
-CONSTR="$WORKSPACE/pip-constraints.txt"
-cat > "$CONSTR" <<'TXT'
-torch==2.4.0+cu124
-torchaudio==2.4.0+cu124
-torchvision==0.19.0+cu124
-TXT
-export PIP_CONSTRAINT="$CONSTR"
-
-# Persistă pin-urile în venv pentru orice pip ulterior (inclusiv Manager)
-grep -q 'PIP_INDEX_URL=' "$COMFY_DIR/venv/bin/activate" || \
-  echo 'export PIP_INDEX_URL=https://download.pytorch.org/whl/cu124' >> "$COMFY_DIR/venv/bin/activate"
-grep -q 'PIP_CONSTRAINT=' "$COMFY_DIR/venv/bin/activate" || \
-  echo 'export PIP_CONSTRAINT=/workspace/pip-constraints.txt' >> "$COMFY_DIR/venv/bin/activate"
-
-# Asigură curățarea versiunilor greșite + TorchCodec
-pip uninstall -y torch torchaudio torchvision torchcodec || true
-pip install --no-cache-dir --force-reinstall \
+# ================== Torch stack (pin cu124) ==================
+# Install *only* torch/torchaudio/torchvision from PyTorch mirror, without changing global index
+pip install --no-cache-dir \
+  --index-url https://download.pytorch.org/whl/cu124 \
   torch==2.4.0+cu124 torchaudio==2.4.0+cu124 torchvision==0.19.0+cu124
 
-# Dezactivează definitiv TorchCodec în torchaudio
-export TORCHAUDIO_USE_TORCHCODEC=0
+# Ensure any previous global pin is removed for the rest of pip installs
+unset PIP_INDEX_URL || true
+unset PIP_EXTRA_INDEX_URL || true
+unset PIP_CONSTRAINT || true
+
+# Persist only the TorchCodec toggle in venv
 grep -q 'TORCHAUDIO_USE_TORCHCODEC' "$COMFY_DIR/venv/bin/activate" || \
   echo 'export TORCHAUDIO_USE_TORCHCODEC=0' >> "$COMFY_DIR/venv/bin/activate"
+export TORCHAUDIO_USE_TORCHCODEC=0
 
 # ================== Dependențe ComfyUI & Manager ==================
 # (ComfyUI core)
