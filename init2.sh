@@ -28,6 +28,7 @@ S_VENV="$STAMP_DIR/venv.ok"
 S_TORCH="$STAMP_DIR/torch.ok"
 S_MGR="$STAMP_DIR/manager.ok"
 S_AUDIO="$STAMP_DIR/audio.ok"
+S_TTS_DEPS="$STAMP_DIR/tts_deps.ok"
 S_CUST="$STAMP_DIR/custom.ok"
 S_WAVS="$STAMP_DIR/voices.ok"
 S_PREFETCH="$STAMP_DIR/prefetch.ok"
@@ -48,7 +49,7 @@ export HF_HOME="${HF_HOME:-$WORKSPACE/.cache/huggingface}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 mkdir -p "$HF_HUB_CACHE"
 
-# Preferințe runtime (activate DEVREME ca să fie vizibile în toate Python-urile)
+# Preferințe runtime
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export TRANSFORMERS_USE_SAFETENSORS=1
 export SAFETENSORS_FAST_GPU=1
@@ -90,7 +91,7 @@ else
   source "$COMFY_DIR/venv/bin/activate"
 fi
 
-# IMPORTANT: instalăm aici hub + transfer (în VENV)
+# hub + transfer în VENV (trebuie înainte de prefetch)
 pip install --no-cache-dir "huggingface_hub==0.35.3" "hf_transfer>=0.1.6" safetensors || true
 
 # ---------- Torch (opțional pin 2.8/cu128) ----------
@@ -154,6 +155,20 @@ if step "$S_AUDIO" "Install audio deps"; then
   mark "$S_AUDIO"
 fi
 
+# ---------- EXTRA: Dependențe TTS Engines (în venv) ----------
+if step "$S_TTS_DEPS" "Install extra TTS engine deps (IndexTTS2, Higgs, RVC, F5)"; then
+  pip install --no-cache-dir \
+    s3tokenizer \
+    "diffusers==0.30.3" \
+    descript-audio-codec \
+    vector-quantize-pytorch \
+    torchcrepe==0.0.23 \
+    sounddevice==0.4.7 \
+    pyaudio==0.2.14 \
+    hydra-core
+  mark "$S_TTS_DEPS"
+fi
+
 # ---------- Instalează deps pentru toate custom nodes ----------
 if step "$S_CUST" "Install custom-nodes requirements"; then
   if [ -d "$CUSTOM_NODES" ]; then
@@ -211,10 +226,9 @@ log "Running audio self-test"
 set +e
 python - <<'PY'
 import os, soundfile, tempfile, numpy as np
-# citim/ scriem prin soundfile ca să nu atingem TorchCodec deloc
 print("Audio Self-Test: TORCHAUDIO_USE_TORCHCODEC =", os.getenv("TORCHAUDIO_USE_TORCHCODEC"))
 sr=44100
-x=(0.1*np.sin(2*np.pi*440*np.arange(int(0.1*sr))/sr)).astype('float32')
+x=(0.1*np.sin(2*np.pi/ (1.0/440) * np.arange(int(0.1*sr))/sr)).astype('float32')
 tmp= tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
 soundfile.write(tmp, x, sr)
 data, rate = soundfile.read(tmp)
