@@ -11,9 +11,9 @@ SKIP_JUPYTER="${SKIP_JUPYTER:-0}"
 JUPYTER_PORT="${JUPYTER_PORT:-8888}"
 JUPYTER_ROOT="${JUPYTER_ROOT:-$WORKSPACE}"
 
-export HF_TOKEN="${HF_TOKEN:-}"          # optional
+export HF_TOKEN="${HF_TOKEN:-}"    # optional
 
-# Pin PyTorch ca pe PC (dacă vrei 2.8/cu128)
+# Pin PyTorch identic cu PC (ex. 2.8/cu128) – lasă 0 dacă nu ai motiv
 PIN_TORCH="${PIN_TORCH:-0}"
 TORCH_INDEX_URL="${TORCH_INDEX_URL:-}"
 TORCH_PKGS="${TORCH_PKGS:-}"
@@ -41,27 +41,28 @@ mark(){ mkdir -p "$STAMP_DIR"; : > "$1"; }
 
 mkdir -p "$WORKSPACE"
 exec > >(tee -a "$LOGFILE") 2>&1
-log "=== ComfyUI + TTS Audio Suite init (loop-safe, cache, Jupyter) ==="
+log "=== ComfyUI + TTS Audio Suite init (loop-safe) ==="
 
-# ---------- Cache-uri HF ----------
+# ---------- Cache HF ----------
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$WORKSPACE/.cache}"
 export HF_HOME="${HF_HOME:-$WORKSPACE/.cache/huggingface}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
 mkdir -p "$HF_HUB_CACHE"
 
-# Preferințe runtime
+# Env runtime (setate devreme)
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export TRANSFORMERS_USE_SAFETENSORS=1
 export SAFETENSORS_FAST_GPU=1
-export TORCHAUDIO_USE_TORCHCODEC=0   # împiedică apelul implicit TorchCodec
+# Evită TorchCodec path implicit (ai avut eroarea cu torchaudio.load)
+export TORCHAUDIO_USE_TORCHCODEC=0
 
 # ---------- Sys deps ----------
 if step "$S_SYS" "Install base packages"; then
   apt-get update || true
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git git-lfs ca-certificates curl python3 python3-venv python3-dev build-essential \
-    procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data aria2 || true
-  git lfs install || true
+    procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data aria2 \
+    && git lfs install || true
   mark "$S_SYS"
 fi
 
@@ -91,10 +92,10 @@ else
   source "$COMFY_DIR/venv/bin/activate"
 fi
 
-# hub + transfer în VENV (trebuie înainte de prefetch)
-pip install --no-cache-dir "huggingface_hub==0.35.3" "hf_transfer>=0.1.6" safetensors || true
+# Hub + transfer în venv
+python -m pip install --no-cache-dir "huggingface_hub==0.35.3" "hf_transfer>=0.1.6" safetensors || true
 
-# ---------- Torch (opțional pin 2.8/cu128) ----------
+# ---------- Torch (opțional pin exact) ----------
 if [ "$PIN_TORCH" = "1" ] && step "$S_TORCH" "Pin PyTorch stack ($TORCH_PKGS)"; then
   pip uninstall -y torch torchaudio torchvision torchcodec || true
   if [ -n "$TORCH_INDEX_URL" ]; then
@@ -135,7 +136,7 @@ if step "$S_MGR" "Sync ComfyUI-Manager"; then
   mark "$S_MGR"
 fi
 
-# Prima pornire -> dezactivează temporar Manager-ul
+# Prima pornire: dezactivează temporar Manager-ul (evită auto-update loop)
 if [ ! -f "$S_FBOOT" ]; then
   log "First boot SAFE mode: disable ComfyUI-Manager to avoid UI update loops"
   [ -d "$MANAGER_DIR" ] && mv "$MANAGER_DIR" "${MANAGER_DIR}.off" || true
@@ -147,27 +148,36 @@ else
   fi
 fi
 
-# ---------- Audio deps pentru TTS Audio Suite ----------
-if step "$S_AUDIO" "Install audio deps"; then
+# ---------- Audio deps necesare TTS Audio Suite ----------
+if step "$S_AUDIO" "Install core audio deps"; then
   pip install --no-cache-dir \
     soundfile==0.13.1 librosa==0.11.0 numba==0.62.1 \
     cached-path==1.8.0 onnxruntime-gpu==1.20.1 audio-separator==0.39.1
   mark "$S_AUDIO"
 fi
 
-# ---------- EXTRA: Dependențe TTS Engines (în venv) ----------
-if step "$S_TTS_DEPS" "Install extra TTS engine deps (IndexTTS2, Higgs, RVC, F5)"; then
+# ---------- Extra deps pt. IndexTTS2 / Higgs / RVC / F5 ----------
+# (Fără PyAudio și Fără s3tokenizer ca să evităm build de ONNX)
+if step "$S_TTS_DEPS" "Install extra TTS engine deps"; then
   pip install --no-cache-dir \
-    s3tokenizer \
     "diffusers==0.30.3" \
     descript-audio-codec \
     vector-quantize-pytorch \
     torchcrepe==0.0.23 \
     sounddevice==0.4.7 \
-    pyaudio==0.2.14 \
     hydra-core
   mark "$S_TTS_DEPS"
 fi
+
+# ---------- (OPȚIONAL) ChatterBox TTS deps (DECOMENTAZĂ doar dacă vrei) ----------
+# ATENȚIE: s3tokenizer poate trage ONNX source build. Încercăm roți prebuild:
+#   - ai putea avea nevoie de apt: cmake protobuf-compiler
+#   - și de pin pe roți care există pentru py311 manylinux
+#: <<'OPTIONAL_CB'
+#apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake protobuf-compiler
+#pip install --no-cache-dir "onnx==1.16.0" "protobuf==3.20.3"
+#pip install --no-cache-dir s3tokenizer diffusers==0.30.3
+#: OPTIONAL_CB
 
 # ---------- Instalează deps pentru toate custom nodes ----------
 if step "$S_CUST" "Install custom-nodes requirements"; then
@@ -180,7 +190,7 @@ if step "$S_CUST" "Install custom-nodes requirements"; then
   mark "$S_CUST"
 fi
 
-# ---------- Prefetch (încălzire cache HF, fără a opri init pe eroare) ----------
+# ---------- Prefetch (cald cache HF; nu oprește init pe eroare) ----------
 if step "$S_PREFETCH" "Prefetch tokenizer + HuBERT into HF cache"; then
   set +e
   python - <<'PY'
@@ -221,19 +231,19 @@ else
   log "✓ Skip: voice refs conversion (none or already done)"
 fi
 
-# ---------- Self-test audio (nu oprim init pe eroare) ----------
+# ---------- Self-test audio (fără TorchCodec; nu oprește init pe eroare) ----------
 log "Running audio self-test"
 set +e
 python - <<'PY'
 import os, soundfile, tempfile, numpy as np
 print("Audio Self-Test: TORCHAUDIO_USE_TORCHCODEC =", os.getenv("TORCHAUDIO_USE_TORCHCODEC"))
 sr=44100
-x=(0.1*np.sin(2*np.pi/ (1.0/440) * np.arange(int(0.1*sr))/sr)).astype('float32')
+x=(0.1*np.sin(2*np.pi*440*np.arange(int(0.1*sr))/sr)).astype('float32')
 tmp= tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
 soundfile.write(tmp, x, sr)
 data, rate = soundfile.read(tmp)
 assert rate==sr and data.size>0
-print("Audio IO OK ✅ (soundfile path)")
+print("Audio IO OK ✅ (soundfile)")
 PY
 set -e
 
