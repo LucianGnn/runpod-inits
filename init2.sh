@@ -62,7 +62,6 @@ if step "$S_SYS" "Install base packages"; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git git-lfs ca-certificates curl python3 python3-venv python3-dev build-essential \
     procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data aria2 \
-    cmake protobuf-compiler \
     && git lfs install || true
   mark "$S_SYS"
 fi
@@ -158,7 +157,7 @@ if step "$S_AUDIO" "Install core audio deps"; then
 fi
 
 # ---------- Extra deps pt. IndexTTS2 / Higgs / RVC / F5 ----------
-# (Fără PyAudio și fără s3tokenizer ca să evităm build-uri grele/ONNX)
+# (Fără PyAudio și Fără s3tokenizer/onnx – evităm build-uri problematice)
 if step "$S_TTS_DEPS" "Install extra TTS engine deps"; then
   pip install --no-cache-dir \
     "diffusers==0.30.3" \
@@ -168,30 +167,15 @@ if step "$S_TTS_DEPS" "Install extra TTS engine deps"; then
     torchcrepe==0.0.23 \
     sounddevice==0.4.7 \
     hydra-core \
-    matplotlib==3.10.7
-
-  # sanity checks – să fie în venv-ul corect
-  python - <<'PY'
-import sys
-def chk(mod):
-    try:
-        m=__import__(mod)
-        print(f"{mod} ✅", getattr(m,"__version__","unknown"))
-    except Exception as e:
-        print(f"{mod} ❌", e)
-for m in ["audiotools","matplotlib","torchcrepe","diffusers"]:
-    chk(m)
-print("python:", sys.executable)
-PY
+    matplotlib==3.10.7 \
+    einops
   mark "$S_TTS_DEPS"
 fi
 
-# ---------- (OPȚIONAL) ChatterBox TTS deps ----------
-# Atenție: s3tokenizer poate cere ONNX build. Doar dacă ai nevoie, decomentează:
+# ---------- (OPȚIONAL) ChatterBox TTS deps (DECOMENTAZĂ doar dacă vrei) ----------
 #: <<'OPTIONAL_CB'
-#apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake protobuf-compiler
-#pip install --no-cache-dir "onnx==1.16.0" "protobuf==3.20.3"
-#pip install --no-cache-dir s3tokenizer diffusers==0.30.3
+# apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake protobuf-compiler
+# pip install --no-cache-dir "onnx==1.16.0" "protobuf==3.20.3" s3tokenizer
 #: OPTIONAL_CB
 
 # ---------- Instalează deps pentru toate custom nodes ----------
@@ -216,12 +200,14 @@ def grab(repo, allow=None):
     kw = dict(repo_id=repo, cache_dir=cache_dir, local_files_only=False, resume_download=True)
     if allow: kw["allow_patterns"]=allow
     try:
-        p = snapshot_download(**kw); print(f"[prefetch] OK {repo} -> {p}")
+        p = snapshot_download(**kw)
+        print(f"[prefetch] OK {repo} -> {p}")
     except Exception as e:
         print(f"[prefetch] WARN {repo}: {e} -> retry w/o hf_transfer")
         os.environ["HF_HUB_ENABLE_HF_TRANSFER"]="0"
         try:
-            p = snapshot_download(**kw); print(f"[prefetch] OK(fallback) {repo} -> {p}")
+            p = snapshot_download(**kw)
+            print(f"[prefetch] OK(fallback) {repo} -> {p}")
         except Exception as e2:
             print(f"[prefetch] SKIP {repo}: {e2}")
 grab("bosonai/higgs-audio-v2-tokenizer")
