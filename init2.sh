@@ -12,13 +12,10 @@ SKIP_JUPYTER="${SKIP_JUPYTER:-0}"
 JUPYTER_PORT="${JUPYTER_PORT:-8888}"
 JUPYTER_ROOT="${JUPYTER_ROOT:-$WORKSPACE}"
 
-# HF Token (dacă ai acces gated / vrei viteză + rate limit mai mare)
+# HF Token (optional)
 export HF_TOKEN="${HF_TOKEN:-}"
 
-# PyTorch control:
-#  - implicit NU schimbă stack-ul existent.
-#  - dacă vrei să impui versiune (ex. 2.8 cu CUDA 12.8, ca pe PC), setează:
-#    PIN_TORCH=1 TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128 TORCH_PKGS="torch==2.8.0+cu128 torchaudio==2.8.0+cu128 torchvision==0.23.0+cu128"
+# Pin PyTorch ca pe PC (doar dacă vrei identic)
 PIN_TORCH="${PIN_TORCH:-0}"
 TORCH_INDEX_URL="${TORCH_INDEX_URL:-}"
 TORCH_PKGS="${TORCH_PKGS:-}"
@@ -27,6 +24,7 @@ LOGFILE="$WORKSPACE/init.log"
 COMFY_LOG="$WORKSPACE/comfyui.log"
 
 STAMP_DIR="$WORKSPACE/.boot"
+S_SPEED="$STAMP_DIR/speed.ok"
 S_SYS="$STAMP_DIR/sys.ok"
 S_COMFY="$STAMP_DIR/comfy.ok"
 S_VENV="$STAMP_DIR/venv.ok"
@@ -38,7 +36,6 @@ S_WAVS="$STAMP_DIR/voices.ok"
 S_PREFETCH="$STAMP_DIR/prefetch.ok"
 S_FBOOT="$STAMP_DIR/first_boot_done"
 S_JUPYTER="$STAMP_DIR/jupyter.ok"
-S_SPEED="$STAMP_DIR/speed.ok"
 
 log(){ echo "[$(date +'%F %T')] $*" | tee -a "$LOGFILE" ; }
 step(){ local f="$1"; shift; [ -f "$f" ] && { log "✓ Skip: $*"; return 1; } || { log "→ $*"; return 0; } }
@@ -46,13 +43,13 @@ mark(){ mkdir -p "$STAMP_DIR"; : > "$1"; }
 
 mkdir -p "$WORKSPACE"
 exec > >(tee -a "$LOGFILE") 2>&1
-log "=== Idempotent ComfyUI + TTS Audio Suite init (speed+cache+safe-boot) ==="
+log "=== Idempotent ComfyUI + TTS Audio Suite init (safe, no curl inside) ==="
 
-# ============== Speed Pack + Cache (HF + LFS + aria2) ==============
-if step "$S_SPEED" "Install git-lfs + aria2, enable HF Transfer, set caches"; then
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git-lfs aria2
-  git lfs install
+# ============== Speed + Cache (HF, LFS) ==============
+if step "$S_SPEED" "Install git-lfs; set caches; enable HF transfer"; then
+  apt-get update || true
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git-lfs || true
+  git lfs install || true
 
   # Cache-uri persistente
   export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$WORKSPACE/.cache}"
@@ -60,29 +57,28 @@ if step "$S_SPEED" "Install git-lfs + aria2, enable HF Transfer, set caches"; th
   export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
   mkdir -p "$HF_HUB_CACHE"
 
-  # Downloader HF rapid (Rust)
+  # pip up + hub modern + transfer rapid
   python3 -m pip install --upgrade pip setuptools wheel
   python3 -m pip install --no-cache-dir "huggingface_hub==0.35.3" "hf_transfer>=0.1.6"
 
-  # Activează HF transfer parționat
+  # Activează transferul fragmentat + safetensors
   export HF_HUB_ENABLE_HF_TRANSFER=1
-  # Folosește safetensors rapid pe GPU când e suportat
   export SAFETENSORS_FAST_GPU=1
   export TRANSFORMERS_USE_SAFETENSORS=1
 
-  # Dacă ai token, lasă-l vizibil pentru huggingface_hub
+  # Token HF (dacă există)
   if [ -n "${HF_TOKEN:-}" ]; then
     export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
   fi
   mark "$S_SPEED"
 fi
 
-# ============== Sys deps (minime + audio) ==============
+# ============== Sys deps minime + audio ==============
 if step "$S_SYS" "Installing base packages (apt)"; then
-  apt-get update
+  apt-get update || true
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git ca-certificates curl python3 python3-venv python3-dev build-essential \
-    procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data
+    procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data || true
   mark "$S_SYS"
 fi
 
@@ -112,20 +108,18 @@ else
   source "$COMFY_DIR/venv/bin/activate"
 fi
 
-# ============== (Optional) Pin PyTorch exact ==============
+# ============== (Optional) Pin PyTorch exact ca pe PC ==============
 if [ "$PIN_TORCH" = "1" ] && step "$S_TORCH" "Pin PyTorch stack ($TORCH_PKGS) via $TORCH_INDEX_URL"; then
   pip uninstall -y torch torchaudio torchvision torchcodec || true
   if [ -n "$TORCH_INDEX_URL" ]; then
     pip install --no-cache-dir --force-reinstall --no-deps --index-url "$TORCH_INDEX_URL" $TORCH_PKGS
   else
-    # Dacă nu dai index explicit, instalează din indexul implicit
     pip install --no-cache-dir --force-reinstall --no-deps $TORCH_PKGS
   fi
-  # curăță variabilele de pip pentru restul dependențelor
   unset PIP_INDEX_URL PIP_EXTRA_INDEX_URL PIP_CONSTRAINT || true
   mark "$S_TORCH"
 else
-  log "✓ Skip: Leaving existing PyTorch as-is (recommended unless ai un motiv clar)."
+  log "✓ Skip: Leaving existing PyTorch as-is."
 fi
 
 # ============== Dependențe ComfyUI core ==============
@@ -134,7 +128,7 @@ if [ -f "$COMFY_DIR/requirements.txt" ]; then
   pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt" || true
 fi
 
-# ============== ComfyUI-Manager (safe-boot) ==============
+# ============== ComfyUI-Manager (safe-boot prima rulare) ==============
 CUSTOM_NODES="$COMFY_DIR/custom_nodes"
 MANAGER_DIR="$CUSTOM_NODES/ComfyUI-Manager"
 mkdir -p "$CUSTOM_NODES"
@@ -155,7 +149,6 @@ if step "$S_MGR" "Sync ComfyUI-Manager"; then
   mark "$S_MGR"
 fi
 
-# Prima pornire: dezactivez temporar Manager-ul ca să evit loop-uri
 if [ ! -f "$S_FBOOT" ]; then
   log "First boot -> SAFE mode (temporarily disable ComfyUI-Manager to avoid loops)"
   [ -d "$MANAGER_DIR" ] && mv "$MANAGER_DIR" "${MANAGER_DIR}.off" || true
@@ -186,41 +179,24 @@ if step "$S_CUST" "Install custom nodes requirements (if any)"; then
   mark "$S_CUST"
 fi
 
-# ============== Convertor automat voice refs -> WAV (44.1kHz mono) ==============
-VOICES_ROOT="$CUSTOM_NODES/TTS-Audio-Suite/voices_examples"
-if [ -d "$VOICES_ROOT" ] && [ ! -f "$S_WAVS" ]; then
-  log "Converting voice refs to WAV (44.1kHz mono)..."
-  while IFS= read -r -d '' f; do
-    wav="${f%.*}.wav"
-    [ -f "$wav" ] || ffmpeg -y -hide_banner -loglevel error -i "$f" -ar 44100 -ac 1 "$wav"
-  done < <(find "$VOICES_ROOT" -type f \( -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.aac' \) -print0)
-  mark "$S_WAVS"
-else
-  log "✓ Skip: voice refs conversion (none or already done)"
-fi
-
 # ============== Prefetch (încălzește cache-ul HF) ==============
 if step "$S_PREFETCH" "Prefetch common models/tokenizers into HF cache"; then
   python - <<'PY'
 import os
 from huggingface_hub import snapshot_download
-
 cache_dir = os.environ.get("HF_HUB_CACHE", "/workspace/.cache/huggingface/hub")
-
-def grab(repo, allow_patterns=None):
+def grab(repo, allow=None):
     kw = dict(repo_id=repo, cache_dir=cache_dir, local_files_only=False, resume_download=True)
-    if allow_patterns: kw["allow_patterns"] = allow_patterns
+    if allow: kw["allow_patterns"]=allow
     p = snapshot_download(**kw)
     print(f"[prefetch] {repo} -> {p}")
-
-# Higgs tokenizer + HuBERT (folosite de tokenizerul HiggsAudio)
 grab("bosonai/higgs-audio-v2-tokenizer")
-grab("facebook/hubert-base-ls960", allow_patterns=["config.json","pytorch_model.bin","preprocessor_config.json"])
+grab("facebook/hubert-base-ls960", allow=["config.json","pytorch_model.bin","preprocessor_config.json"])
 PY
   mark "$S_PREFETCH"
 fi
 
-# ============== Self-test audio (torchaudio; fără TorchCodec) ==============
+# ============== Self-test audio (torchaudio) ==============
 log "Running audio self-test"
 python - <<'PY'
 import os, torchaudio, soundfile, tempfile, numpy as np
@@ -242,11 +218,9 @@ else
   ( command -v fuser >/dev/null 2>&1 && fuser -k "${COMFY_PORT}/tcp" ) || true
   log "Starting ComfyUI on ${HOST}:${COMFY_PORT}"
   export PYTHONUNBUFFERED=1
-  # Preferă safetensors & HF transfer la runtime
   export TRANSFORMERS_USE_SAFETENSORS=1
   export SAFETENSORS_FAST_GPU=1
   export HF_HUB_ENABLE_HF_TRANSFER=1
-  # (opțional) dezactivează TorchCodec cu torchaudio dacă te-a mușcat în trecut
   export TORCHAUDIO_USE_TORCHCODEC=0
   nohup python main.py --listen "$HOST" --port "$COMFY_PORT" > "$COMFY_LOG" 2>&1 &
   log "Comfy log at: $COMFY_LOG"
