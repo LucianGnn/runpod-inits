@@ -43,10 +43,16 @@ mark(){ mkdir -p "$STAMP_DIR"; : > "$1"; }
 
 mkdir -p "$WORKSPACE"
 exec > >(tee -a "$LOGFILE") 2>&1
-log "=== Idempotent ComfyUI + TTS Audio Suite init (loop-safe) ==="
+log "=== ComfyUI + TTS Audio Suite init (loop-safe) ==="
 
-# ============== Sys deps + speed basics ==============
-if step "$S_SYS" "Installing base packages (apt)"; then
+# ---- Cache HF (persistente) ----
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$WORKSPACE/.cache}"
+export HF_HOME="${HF_HOME:-$WORKSPACE/.cache/huggingface}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+mkdir -p "$HF_HUB_CACHE"
+
+# ---- Sys deps + aria2/git-lfs (viteze mai bune la modele) ----
+if step "$S_SYS" "Install base packages"; then
   apt-get update || true
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git git-lfs ca-certificates curl python3 python3-venv python3-dev build-essential \
@@ -55,13 +61,7 @@ if step "$S_SYS" "Installing base packages (apt)"; then
   mark "$S_SYS"
 fi
 
-# Cache-uri HF
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$WORKSPACE/.cache}"
-export HF_HOME="${HF_HOME:-$WORKSPACE/.cache/huggingface}"
-export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
-mkdir -p "$HF_HUB_CACHE"
-
-# ============== ComfyUI clone/update ==============
+# ---- Clone / update ComfyUI ----
 if step "$S_COMFY" "Clone/Update ComfyUI -> $COMFY_DIR"; then
   if [ ! -d "$COMFY_DIR/.git" ]; then
     git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
@@ -75,7 +75,7 @@ if step "$S_COMFY" "Clone/Update ComfyUI -> $COMFY_DIR"; then
   mark "$S_COMFY"
 fi
 
-# ============== Python venv ==============
+# ---- VENV ----
 if step "$S_VENV" "Create/prepare Python venv"; then
   [ -d "$COMFY_DIR/venv" ] || python3 -m venv "$COMFY_DIR/venv"
   # shellcheck disable=SC1091
@@ -87,7 +87,7 @@ else
   source "$COMFY_DIR/venv/bin/activate"
 fi
 
-# ============== Torch (opțional pin identic) ==============
+# ---- (Opțional) Torch identic cu PC-ul (Higgs cere >=2.6) ----
 if [ "$PIN_TORCH" = "1" ] && step "$S_TORCH" "Pin PyTorch stack ($TORCH_PKGS)"; then
   pip uninstall -y torch torchaudio torchvision torchcodec || true
   if [ -n "$TORCH_INDEX_URL" ]; then
@@ -98,16 +98,16 @@ if [ "$PIN_TORCH" = "1" ] && step "$S_TORCH" "Pin PyTorch stack ($TORCH_PKGS)"; 
   unset PIP_INDEX_URL PIP_EXTRA_INDEX_URL PIP_CONSTRAINT || true
   mark "$S_TORCH"
 else
-  log "✓ Skip: Leaving existing PyTorch as-is."
+  log "✓ Skip: Keeping existing Torch (as in base image)."
 fi
 
-# ============== Dependențe ComfyUI core ==============
+# ---- ComfyUI requirements ----
 if [ -f "$COMFY_DIR/requirements.txt" ]; then
   log "Installing ComfyUI requirements.txt"
   pip install --no-cache-dir -r "$COMFY_DIR/requirements.txt" || true
 fi
 
-# ============== ComfyUI-Manager (safe-boot) ==============
+# ---- Manager (safe-boot) ----
 CUSTOM_NODES="$COMFY_DIR/custom_nodes"
 MANAGER_DIR="$CUSTOM_NODES/ComfyUI-Manager"
 mkdir -p "$CUSTOM_NODES"
@@ -128,9 +128,9 @@ if step "$S_MGR" "Sync ComfyUI-Manager"; then
   mark "$S_MGR"
 fi
 
-# Prima pornire: dezactivează temporar Manager-ul (evită auto-update loop)
+# Prima pornire: disable Manager ca să eviți auto-update loops
 if [ ! -f "$S_FBOOT" ]; then
-  log "First boot -> SAFE mode (temporarily disable ComfyUI-Manager to avoid loops)"
+  log "First boot -> SAFE mode (temporarily disable ComfyUI-Manager)"
   [ -d "$MANAGER_DIR" ] && mv "$MANAGER_DIR" "${MANAGER_DIR}.off" || true
   : > "$S_FBOOT"
 else
@@ -140,7 +140,7 @@ else
   fi
 fi
 
-# ============== Audio deps pentru TTS Audio Suite ==============
+# ---- Audio deps pentru TTS Audio Suite ----
 if step "$S_AUDIO" "Install audio deps for TTS Audio Suite"; then
   pip install --no-cache-dir \
     soundfile==0.13.1 librosa==0.11.0 numba==0.62.1 \
@@ -148,23 +148,19 @@ if step "$S_AUDIO" "Install audio deps for TTS Audio Suite"; then
   mark "$S_AUDIO"
 fi
 
-# ============== Global HF + transfer în VENV (FIX loop) ==============
-if step "$S_SPEED" "Install HF hub + hf_transfer in VENV"; then
-  # IMPORTANT: în venv, ca să existe când rulează Python din venv
+# ---- HF Hub + hf_transfer ÎN VENV (obligatoriu înainte de prefetch) ----
+if step "$S_SPEED" "Install huggingface_hub + hf_transfer + safetensors (venv)"; then
   pip install --no-cache-dir "huggingface_hub==0.35.3" "hf_transfer>=0.1.6" safetensors
-  # activează transferul fragmentat doar după ce modulul există în venv
   export HF_HUB_ENABLE_HF_TRANSFER=1
   export TRANSFORMERS_USE_SAFETENSORS=1
   export SAFETENSORS_FAST_GPU=1
-  # token
   if [ -n "${HF_TOKEN:-}" ]; then
     export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
   fi
-  # Notăm că am făcut și partea de speed aici (reutilizăm stampul)
   mark "$S_SPEED"
 fi
 
-# ============== Instalează deps pentru toate custom nodes ==============
+# ---- Instalează deps pentru toate custom nodes (best-effort) ----
 if step "$S_CUST" "Install custom nodes requirements (if any)"; then
   if [ -d "$CUSTOM_NODES" ]; then
     while IFS= read -r -d '' req; do
@@ -175,11 +171,11 @@ if step "$S_CUST" "Install custom nodes requirements (if any)"; then
   mark "$S_CUST"
 fi
 
-# ============== Prefetch (căldură HF cache; loop-safe) ==============
+# ---- Prefetch (warm cache) — NEVER fail init ----
 if step "$S_PREFETCH" "Prefetch common models/tokenizers into HF cache"; then
-  set +e  # nu omorî init-ul dacă pică prefetch-ul
+  set +e
   python - <<'PY'
-import os, sys
+import os
 from huggingface_hub import snapshot_download
 
 cache_dir = os.environ.get("HF_HUB_CACHE", "/workspace/.cache/huggingface/hub")
@@ -191,7 +187,6 @@ def grab(repo, allow=None):
         p = snapshot_download(**kw)
         print(f"[prefetch] OK {repo} -> {p}")
     except Exception as e:
-        # Fallback: dezactivează HF_TRANSFER și reîncearcă simplu
         print(f"[prefetch] WARN {repo}: {e} -> retry without HF_TRANSFER")
         os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
         try:
@@ -200,6 +195,7 @@ def grab(repo, allow=None):
         except Exception as e2:
             print(f"[prefetch] SKIP {repo}: {e2}")
 
+# Higgs tokenizer + HuBERT folosit de tokenizer
 grab("bosonai/higgs-audio-v2-tokenizer")
 grab("facebook/hubert-base-ls960", allow=["config.json","pytorch_model.bin","preprocessor_config.json"])
 PY
@@ -207,7 +203,7 @@ PY
   mark "$S_PREFETCH"
 fi
 
-# ============== Convertor automat voice refs -> WAV ==============
+# ---- Convertor voice refs -> WAV (44.1kHz mono) ----
 VOICES_ROOT="$CUSTOM_NODES/TTS-Audio-Suite/voices_examples"
 if [ -d "$VOICES_ROOT" ] && [ ! -f "$S_WAVS" ]; then
   log "Converting voice refs to WAV (44.1kHz mono)..."
@@ -220,21 +216,23 @@ else
   log "✓ Skip: voice refs conversion (none or already done)"
 fi
 
-# ============== Self-test audio (torchaudio) ==============
-log "Running audio self-test"
+# ---- Self-test audio (fără TorchCodec; nu fail-ează init-ul) ----
+# IMPORTANT: dezactivăm explicit TorchCodec, ca torchaudio să NU încerce acel backend.
+export TORCHAUDIO_USE_TORCHCODEC=0
 python - <<'PY'
-import os, torchaudio, soundfile, tempfile, numpy as np
+import os, soundfile, tempfile, numpy as np
 print("Audio Self-Test: TORCHAUDIO_USE_TORCHCODEC =", os.getenv("TORCHAUDIO_USE_TORCHCODEC"))
 sr=44100
 x=(0.1*np.sin(2*np.pi*440*np.arange(int(0.1*sr))/sr)).astype('float32')
 tmp= tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
 soundfile.write(tmp, x, sr)
-wav, rate = torchaudio.load(tmp)
-assert rate==sr and wav.numel()>0
-print("Audio IO OK ✅")
+# citire tot cu soundfile ca să evităm orice backend exotic
+data, rate = soundfile.read(tmp)
+assert rate==sr and data.size>0
+print("Audio IO OK ✅ (soundfile backend)")
 PY
 
-# ============== Launch ComfyUI (guard împotriva dublării) ==============
+# ---- Launch ComfyUI ----
 cd "$COMFY_DIR"
 if pgrep -f "$COMFY_DIR/venv/bin/python .*main.py" >/dev/null 2>&1; then
   log "ComfyUI already running; skip start."
@@ -250,9 +248,9 @@ else
   log "Comfy log at: $COMFY_LOG"
 fi
 
-# ============== JupyterLab (foreground) ==============
+# ---- Jupyter (foreground) ----
 if [ "$SKIP_JUPYTER" != "1" ]; then
-  if step "$S_JUPYTER" "Installing JupyterLab (first time may take a bit)"; then
+  if step "$S_JUPYTER" "Installing JupyterLab (first run)"; then
     pip install --no-cache-dir jupyterlab
     mark "$S_JUPYTER"
   else
