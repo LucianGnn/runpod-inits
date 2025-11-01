@@ -62,6 +62,7 @@ if step "$S_SYS" "Install base packages"; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git git-lfs ca-certificates curl python3 python3-venv python3-dev build-essential \
     procps net-tools lsof ffmpeg portaudio19-dev espeak espeak-data aria2 \
+    cmake protobuf-compiler \
     && git lfs install || true
   mark "$S_SYS"
 fi
@@ -157,22 +158,36 @@ if step "$S_AUDIO" "Install core audio deps"; then
 fi
 
 # ---------- Extra deps pt. IndexTTS2 / Higgs / RVC / F5 ----------
-# (Fără PyAudio și Fără s3tokenizer ca să evităm build de ONNX)
+# (Fără PyAudio și fără s3tokenizer ca să evităm build-uri grele/ONNX)
 if step "$S_TTS_DEPS" "Install extra TTS engine deps"; then
   pip install --no-cache-dir \
     "diffusers==0.30.3" \
     descript-audio-codec \
+    "descript-audiotools==0.7.2" \
     vector-quantize-pytorch \
     torchcrepe==0.0.23 \
     sounddevice==0.4.7 \
-    hydra-core
+    hydra-core \
+    matplotlib==3.10.7
+
+  # sanity checks – să fie în venv-ul corect
+  python - <<'PY'
+import sys
+def chk(mod):
+    try:
+        m=__import__(mod)
+        print(f"{mod} ✅", getattr(m,"__version__","unknown"))
+    except Exception as e:
+        print(f"{mod} ❌", e)
+for m in ["audiotools","matplotlib","torchcrepe","diffusers"]:
+    chk(m)
+print("python:", sys.executable)
+PY
   mark "$S_TTS_DEPS"
 fi
 
-# ---------- (OPȚIONAL) ChatterBox TTS deps (DECOMENTAZĂ doar dacă vrei) ----------
-# ATENȚIE: s3tokenizer poate trage ONNX source build. Încercăm roți prebuild:
-#   - ai putea avea nevoie de apt: cmake protobuf-compiler
-#   - și de pin pe roți care există pentru py311 manylinux
+# ---------- (OPȚIONAL) ChatterBox TTS deps ----------
+# Atenție: s3tokenizer poate cere ONNX build. Doar dacă ai nevoie, decomentează:
 #: <<'OPTIONAL_CB'
 #apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake protobuf-compiler
 #pip install --no-cache-dir "onnx==1.16.0" "protobuf==3.20.3"
@@ -201,14 +216,12 @@ def grab(repo, allow=None):
     kw = dict(repo_id=repo, cache_dir=cache_dir, local_files_only=False, resume_download=True)
     if allow: kw["allow_patterns"]=allow
     try:
-        p = snapshot_download(**kw)
-        print(f"[prefetch] OK {repo} -> {p}")
+        p = snapshot_download(**kw); print(f"[prefetch] OK {repo} -> {p}")
     except Exception as e:
         print(f"[prefetch] WARN {repo}: {e} -> retry w/o hf_transfer")
         os.environ["HF_HUB_ENABLE_HF_TRANSFER"]="0"
         try:
-            p = snapshot_download(**kw)
-            print(f"[prefetch] OK(fallback) {repo} -> {p}")
+            p = snapshot_download(**kw); print(f"[prefetch] OK(fallback) {repo} -> {p}")
         except Exception as e2:
             print(f"[prefetch] SKIP {repo}: {e2}")
 grab("bosonai/higgs-audio-v2-tokenizer")
